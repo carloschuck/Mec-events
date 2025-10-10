@@ -41,7 +41,10 @@ services:
       - key: DEFAULT_SOURCE_URL
         value: https://housesoflight.org
       - key: MEC_API_URL
-        value: https://housesoflight.org/wp-json/mec/v1.0
+        value: https://housesoflight.org
+      - key: MEC_API_KEY
+        value: YOUR_MEC_API_KEY_HERE
+        type: SECRET
       - key: CLIENT_URL
         value: ${APP_URL}
       - key: ORG_NAME
