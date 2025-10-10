@@ -330,9 +330,9 @@ add_action('wp_ajax_mec_test_webhook', function() {
     $test_data = array(
         'event_type' => 'test.webhook',
         'data' => array(
-            'message' => 'This is a test webhook from MEC Webhook Bridge',
-            'timestamp' => current_time('mysql')
+            'message' => 'This is a test webhook from MEC Webhook Bridge'
         ),
+        'timestamp' => current_time('mysql'),
         'site_url' => get_site_url()
     );
     
