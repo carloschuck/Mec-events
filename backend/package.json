@@ -10,6 +10,7 @@
     "init-db": "node src/scripts/init-database.js",
     "check-db": "node src/scripts/check-and-setup-db.js",
     "setup": "node src/scripts/manual-setup.js",
+    "setup-db": "node src/scripts/setup-database.js",
     "migrate": "node src/scripts/migrate.js",
     "seed": "node src/scripts/seed.js"
   },
