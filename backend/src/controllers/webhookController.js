@@ -37,10 +37,11 @@ export const handleMecWebhook = async (req, res) => {
     // Handle different event types
     switch (event_type) {
       case 'test.webhook':
-        console.log('✅ Test webhook received successfully');
+      case 'test.api':
+        console.log('✅ Test webhook/API received successfully');
         return res.json({
           success: true,
-          message: 'Test webhook received',
+          message: 'Test webhook/API received',
           received_at: new Date().toISOString()
         });
 
