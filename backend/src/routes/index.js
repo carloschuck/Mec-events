@@ -42,5 +42,72 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Database setup endpoint
+router.get('/setup-db', async (req, res) => {
+  try {
+    console.log('🔍 Running database setup check...');
+    
+    // Import required modules
+    const { User } = await import('../models/index.js');
+    const bcrypt = (await import('bcryptjs')).default;
+    
+    // Check if admin user exists
+    const adminEmail = 'admin@housesoflight.org';
+    const existingAdmin = await User.findOne({ where: { email: adminEmail } });
+    
+    if (existingAdmin) {
+      console.log(`✅ Admin user already exists: ${adminEmail}`);
+      res.json({
+        success: true,
+        message: 'Database is properly set up',
+        adminUser: {
+          id: existingAdmin.id,
+          email: existingAdmin.email,
+          firstName: existingAdmin.firstName,
+          lastName: existingAdmin.lastName,
+          role: existingAdmin.role,
+          isActive: existingAdmin.isActive
+        }
+      });
+    } else {
+      console.log('❌ Admin user does not exist. Creating...');
+      
+      const adminPassword = 'admin123';
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+      const adminUser = await User.create({
+        firstName: 'Admin',
+        lastName: 'User',
+        email: adminEmail,
+        password: hashedPassword,
+        role: 'admin',
+        isActive: true,
+      });
+
+      console.log(`✅ Admin user created: ${adminEmail}`);
+      res.json({
+        success: true,
+        message: 'Admin user created successfully',
+        adminUser: {
+          id: adminUser.id,
+          email: adminUser.email,
+          firstName: adminUser.firstName,
+          lastName: adminUser.lastName,
+          role: adminUser.role,
+          isActive: adminUser.isActive
+        },
+        defaultPassword: 'admin123'
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error setting up database:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error setting up database',
+      error: error.message
+    });
+  }
+});
+
 export default router;
 
