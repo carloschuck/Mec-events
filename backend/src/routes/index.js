@@ -4,6 +4,7 @@ import eventRoutes from './eventRoutes.js';
 import registrationRoutes from './registrationRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import webhookRoutes from './webhookRoutes.js';
+import mecApiRoutes from './mecApiRoutes.js';
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.use('/events', eventRoutes);
 router.use('/registrations', registrationRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/webhooks', webhookRoutes);
+router.use('/mec-api', mecApiRoutes);
 console.log('✅ All route modules mounted successfully');
 
 // Database setup endpoint
