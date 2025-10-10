@@ -46,7 +46,9 @@ const Events = () => {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await api.post('/events/sync');
+      const response = await api.post('/mec-api/sync/events', {
+        sourceUrl: 'https://housesoflight.org'
+      });
       if (response.data.success) {
         toast.success('Events synced successfully!');
         fetchEvents();
