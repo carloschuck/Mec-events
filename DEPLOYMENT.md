@@ -11,7 +11,9 @@
 - [ ] Set NODE_ENV=production
 
 ### Configuration
-- [ ] Configure MEC API URL and credentials
+- [ ] Configure MEC API URL and credentials (if using API sync)
+- [ ] Set up webhook secret (WEBHOOK_SECRET)
+- [ ] Configure default source URL (DEFAULT_SOURCE_URL)
 - [ ] Set up email (SMTP) configuration
 - [ ] Update organization name and branding
 - [ ] Configure cron schedules for your timezone
@@ -20,7 +22,10 @@
 
 ### Testing
 - [ ] Test login with admin and staff accounts
-- [ ] Verify MEC API sync works
+- [ ] Verify webhook endpoint is accessible
+- [ ] Test webhook from WordPress plugin
+- [ ] Verify MEC API sync works (if using API method)
+- [ ] Test multi-site event syncing (if applicable)
 - [ ] Test QR code generation and scanning
 - [ ] Verify email sending (reminder, follow-up)
 - [ ] Test PDF and CSV exports
@@ -67,6 +72,8 @@ Add these to backend service:
 ```
 NODE_ENV=production
 JWT_SECRET=<your-strong-secret>
+WEBHOOK_SECRET=<your-webhook-secret>
+DEFAULT_SOURCE_URL=https://housesoflight.org
 MEC_API_URL=https://housesoflight.org/wp-json/mec/v1.0
 CLIENT_URL=https://your-app.ondigitalocean.app
 DB_HOST=<db-host>
@@ -93,6 +100,8 @@ VITE_API_URL=https://your-backend-url/api
 3. Note the app URL
 
 ### 6. Post-Deployment
+
+**First Time Deployment:**
 ```bash
 # SSH into backend container via App Platform console
 # Seed database
@@ -103,6 +112,21 @@ Or use DigitalOcean's console to run:
 ```bash
 cd /app && npm run seed
 ```
+
+**Upgrading Existing Deployment (Multi-Site Support):**
+```bash
+# If you already have data and are adding multi-site support
+# Run the migration script
+cd /app && node src/scripts/migrate-multi-site.js
+```
+
+**Configure WordPress Plugin:**
+1. Install the MEC Webhook Bridge plugin on your WordPress site(s)
+2. Configure webhook URL: `https://your-app.ondigitalocean.app/api/webhooks/mec`
+3. Set webhook secret to match `WEBHOOK_SECRET` env variable
+4. Enable webhooks and test
+
+See [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md) for detailed multi-site configuration.
 
 ## DigitalOcean Droplet
 
@@ -140,14 +164,26 @@ git clone <your-repo-url>
 cd Mec-events
 
 # Configure environment
-cp .env.example .env
-nano .env  # Edit with production values
+cp backend/.env.example backend/.env
+nano backend/.env  # Edit with production values
+# Make sure to set:
+# - JWT_SECRET
+# - WEBHOOK_SECRET
+# - DEFAULT_SOURCE_URL
+# - Database credentials
+# - Email settings
+
+cp frontend/.env.example frontend/.env
+nano frontend/.env  # Set VITE_API_URL
 
 # Start services
 docker-compose up -d
 
-# Seed database (first time)
+# Seed database (first time only)
 docker-compose exec backend npm run seed
+
+# OR if upgrading existing deployment with multi-site support
+docker-compose exec backend node src/scripts/migrate-multi-site.js
 
 # Check logs
 docker-compose logs -f
@@ -221,11 +257,16 @@ crontab -e
 
 ### Health Checks
 - [ ] Backend health: https://your-domain.com/api/health
+- [ ] Webhook endpoint: https://your-domain.com/api/webhooks/mec
 - [ ] Frontend loads properly
 - [ ] Login works
 - [ ] Database connection successful
 
 ### Functionality Tests
+- [ ] Test webhook from WordPress plugin
+- [ ] Verify events sync from WordPress
+- [ ] Verify registrations sync properly
+- [ ] Test multi-site setup (if using multiple sites)
 - [ ] Create test event
 - [ ] Register test attendee
 - [ ] Generate QR code
@@ -233,6 +274,14 @@ crontab -e
 - [ ] Export PDF/CSV
 - [ ] Send test email
 - [ ] Check cron jobs are running
+
+### Multi-Site Verification (if applicable)
+- [ ] Install plugin on each WordPress site
+- [ ] Configure each plugin with same webhook URL and secret
+- [ ] Test webhook from each site
+- [ ] Verify events from different sites appear in database
+- [ ] Check `sourceUrl` field is correctly populated
+- [ ] Verify no duplicate events between sites
 
 ### Monitoring
 - [ ] Set up uptime monitoring (UptimeRobot, StatusCake)
@@ -309,12 +358,23 @@ docker-compose exec postgres pg_dump -U postgres mec_dashboard > backup.sql
 # Pull updates
 git pull origin main
 
+# Check if migration is needed
+# Review CHANGELOG or commit messages for migration requirements
+
+# Run migrations if needed (e.g., for multi-site support)
+docker-compose exec backend node src/scripts/migrate-multi-site.js
+
 # Rebuild and restart
 docker-compose down
 docker-compose up -d --build
 
 # Verify everything works
 docker-compose logs -f
+
+# Test webhook connectivity
+curl -X POST https://your-domain.com/api/webhooks/mec \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"test.webhook","data":{},"site_url":"test"}'
 ```
 
 ## Troubleshooting Production Issues

@@ -9,7 +9,8 @@ A full-stack web application for managing event registrations, analytics, and ch
 ## 🎯 Features
 
 ### Core Features
-- **MEC Integration** - Sync events and bookings from Modern Events Calendar REST API
+- **MEC Integration** - Real-time webhook sync & REST API for Modern Events Calendar
+- **Multi-Site Support** - Aggregate events from multiple WordPress sites
 - **Authentication** - Secure JWT-based auth with Admin and Staff roles
 - **Dashboard** - Analytics overview with KPIs, charts, and trends
 - **Event Management** - View, filter, and monitor events with detailed stats
@@ -17,6 +18,7 @@ A full-stack web application for managing event registrations, analytics, and ch
 - **PDF/CSV Export** - Customizable attendee list exports
 - **Email Notifications** - Automated reminders and follow-up emails
 - **Automated Tasks** - Cron jobs for syncing data and sending reminders
+- **WordPress Plugin** - Bridge plugin for webhook integration
 
 ### Tech Stack
 
@@ -52,6 +54,8 @@ A full-stack web application for managing event registrations, analytics, and ch
 - **PostgreSQL** 15+ (or use Docker)
 - **Git**
 - **Docker** (optional, for containerized deployment)
+- **WordPress with MEC** (Modern Events Calendar plugin installed)
+- **Access to install WordPress plugins** (for webhook integration)
 
 ## 🚀 Quick Start
 
@@ -173,7 +177,11 @@ DB_PASSWORD=postgres
 JWT_SECRET=your-super-secret-jwt-key-change-this
 JWT_EXPIRES_IN=7d
 
-# MEC API
+# Webhook (Recommended)
+WEBHOOK_SECRET=your-webhook-secret-change-in-production
+DEFAULT_SOURCE_URL=https://housesoflight.org
+
+# MEC API (Optional, for API-based sync)
 MEC_API_URL=https://housesoflight.org/wp-json/mec/v1.0
 MEC_API_AUTH_USER=
 MEC_API_AUTH_PASS=
@@ -245,7 +253,38 @@ Mec-events/
 └── README.md
 ```
 
+## 🔗 WordPress Integration
+
+### Webhook Method (Recommended)
+
+The system uses a WordPress plugin to send real-time webhooks when events and bookings are created/updated.
+
+#### Setup Instructions:
+
+1. **Install the WordPress plugin**
+   - Upload `wordpress-plugin/mec-webhook-bridge.php` to your WordPress site
+   - Activate the plugin
+
+2. **Configure the plugin**
+   - Go to `Settings → MEC Webhook Bridge`
+   - Webhook URL: `https://your-backend.com/api/webhooks/mec`
+   - Webhook Secret: (same as `WEBHOOK_SECRET` in backend `.env`)
+   - Enable webhooks
+
+3. **Test the webhook**
+   - Click "Send Test Webhook" button
+   - Check backend logs for confirmation
+
+**Multi-Site Setup:** Install the plugin on multiple WordPress sites to aggregate events. See [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md) for details.
+
+### API Method (Alternative)
+
+Alternatively, sync via MEC REST API with cron jobs. Configure `MEC_API_URL` in `.env`.
+
 ## 🔌 API Endpoints
+
+### Webhooks
+- `POST /api/webhooks/mec` - Receive MEC webhooks
 
 ### Authentication
 - `POST /api/auth/register` - Register new user (admin only)
@@ -278,9 +317,10 @@ Mec-events/
 
 The backend runs automated scheduled tasks:
 
-1. **MEC Sync** (Every 3 hours by default)
+1. **MEC Sync** (Every 3 hours by default, optional if using webhooks)
    - Syncs events and bookings from MEC API
    - Updates local database
+   - Only needed if not using webhook method
 
 2. **Event Reminders** (9 AM daily by default)
    - Sends reminder emails 24 hours before events
@@ -295,9 +335,11 @@ The backend runs automated scheduled tasks:
 
 Configure schedules in `.env`:
 ```env
-SYNC_CRON_SCHEDULE=0 */3 * * *      # Cron expression
+SYNC_CRON_SCHEDULE=0 */3 * * *      # Cron expression (optional with webhooks)
 REMINDER_CRON_SCHEDULE=0 9 * * *
 ```
+
+**Note:** With webhook integration, real-time sync happens automatically. The cron sync job is optional as a backup.
 
 [Cron Expression Guide](https://crontab.guru/)
 
@@ -343,6 +385,12 @@ REMINDER_CRON_SCHEDULE=0 9 * * *
 
 ## 🚢 Deployment
 
+Comprehensive deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+Multi-site setup guide: [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md)
+
+### Quick Deployment Steps
+
 ### DigitalOcean App Platform
 
 1. **Create New App**
@@ -350,13 +398,18 @@ REMINDER_CRON_SCHEDULE=0 9 * * *
    - Select `docker-compose.yml`
 
 2. **Configure Environment**
-   - Add all required environment variables
+   - Add all required environment variables (including `WEBHOOK_SECRET`)
    - Set production database credentials
 
 3. **Deploy**
    - App Platform handles build and deployment
    - Automatic SSL certificates
    - Auto-scaling support
+
+4. **Configure WordPress**
+   - Install MEC Webhook Bridge plugin
+   - Point webhook URL to your deployed backend
+   - Test webhook connectivity
 
 ### DigitalOcean Droplet
 
@@ -432,6 +485,9 @@ docker-compose logs -f
 npm start          # Start production server
 npm run dev        # Start dev server with nodemon
 npm run seed       # Seed database with sample data
+
+# Migration scripts
+node src/scripts/migrate-multi-site.js  # Add multi-site support to existing DB
 ```
 
 ### Frontend
@@ -453,12 +509,20 @@ npm run preview    # Preview production build
 
 MIT License - See LICENSE file for details
 
+## 📚 Documentation
+
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Comprehensive deployment guide
+- **[MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md)** - Multi-site configuration
+- **[wordpress-plugin/README.md](wordpress-plugin/README.md)** - WordPress plugin docs
+- **[PROJECT-SUMMARY.md](PROJECT-SUMMARY.md)** - Technical overview
+- **[LOCAL-TESTING-GUIDE.md](LOCAL-TESTING-GUIDE.md)** - Local development setup
+
 ## 💬 Support
 
 For issues, questions, or contributions:
 - Open an issue on GitHub
 - Email: support@example.com
-- Documentation: [Link to docs]
+- Review documentation above
 
 ## 🙏 Acknowledgments
 

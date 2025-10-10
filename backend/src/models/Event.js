@@ -10,8 +10,12 @@ const Event = sequelize.define('Event', {
   mecEventId: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     comment: 'Event ID from MEC WordPress plugin'
+  },
+  sourceUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'WordPress site URL where event originates'
   },
   title: {
     type: DataTypes.STRING,
@@ -57,8 +61,14 @@ const Event = sequelize.define('Event', {
   timestamps: true,
   indexes: [
     { fields: ['mecEventId'] },
+    { fields: ['sourceUrl'] },
     { fields: ['startDate'] },
-    { fields: ['status'] }
+    { fields: ['status'] },
+    {
+      unique: true,
+      fields: ['sourceUrl', 'mecEventId'],
+      name: 'unique_event_per_site'
+    }
   ]
 });
 

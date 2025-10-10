@@ -40,24 +40,24 @@ export const handleMecWebhook = async (req, res) => {
 
       case 'event.saved':
       case 'event.published':
-        await handleEventWebhook(data);
+        await handleEventWebhook(data, site_url);
         break;
 
       case 'event.deleted':
-        await handleEventDeletion(data);
+        await handleEventDeletion(data, site_url);
         break;
 
       case 'booking.completed':
       case 'booking.confirmed':
-        await handleBookingWebhook(data);
+        await handleBookingWebhook(data, site_url);
         break;
 
       case 'booking.canceled':
-        await handleBookingCancellation(data);
+        await handleBookingCancellation(data, site_url);
         break;
 
       case 'attendee.checked_in':
-        await handleCheckin(data);
+        await handleCheckin(data, site_url);
         break;
 
       default:
@@ -80,7 +80,7 @@ export const handleMecWebhook = async (req, res) => {
   }
 };
 
-async function handleEventWebhook(data) {
+async function handleEventWebhook(data, site_url) {
   try {
     const { event_id, event_data } = data;
     
@@ -94,6 +94,7 @@ async function handleEventWebhook(data) {
     // Parse event data
     const eventRecord = {
       mecEventId: String(event_id),
+      sourceUrl: site_url,
       title: event_data.title || 'Untitled Event',
       description: event_data.description || '',
       startDate: mec_data.start ? new Date(mec_data.start) : new Date(),
@@ -108,32 +109,35 @@ async function handleEventWebhook(data) {
     };
 
     await Event.upsert(eventRecord, {
-      conflictFields: ['mecEventId']
+      conflictFields: ['sourceUrl', 'mecEventId']
     });
 
-    console.log(`✅ Event ${event_id} synced: ${eventRecord.title}`);
+    console.log(`✅ Event ${event_id} synced from ${site_url}: ${eventRecord.title}`);
   } catch (error) {
     console.error('Error handling event webhook:', error);
   }
 }
 
-async function handleEventDeletion(data) {
+async function handleEventDeletion(data, site_url) {
   try {
     const { event_id } = data;
     
     const deleted = await Event.destroy({
-      where: { mecEventId: String(event_id) }
+      where: { 
+        mecEventId: String(event_id),
+        sourceUrl: site_url
+      }
     });
 
     if (deleted) {
-      console.log(`✅ Event ${event_id} deleted from database`);
+      console.log(`✅ Event ${event_id} from ${site_url} deleted from database`);
     }
   } catch (error) {
     console.error('Error handling event deletion:', error);
   }
 }
 
-async function handleBookingWebhook(data) {
+async function handleBookingWebhook(data, site_url) {
   try {
     const { booking_id, booking_data } = data;
     
@@ -142,19 +146,23 @@ async function handleBookingWebhook(data) {
       return;
     }
 
-    // Find the event
+    // Find the event from the same site
     const event = await Event.findOne({
-      where: { mecEventId: String(booking_data.event_id) }
+      where: { 
+        mecEventId: String(booking_data.event_id),
+        sourceUrl: site_url
+      }
     });
 
     if (!event) {
-      console.log(`⚠️  Event not found for booking ${booking_id}`);
+      console.log(`⚠️  Event not found for booking ${booking_id} from ${site_url}`);
       return;
     }
 
     // Parse booking data
     const registrationRecord = {
       mecBookingId: String(booking_id),
+      sourceUrl: site_url,
       eventId: event.id,
       attendeeName: booking_data.name || `${booking_data.first_name || ''} ${booking_data.last_name || ''}`.trim(),
       attendeeEmail: booking_data.email || '',
@@ -165,37 +173,43 @@ async function handleBookingWebhook(data) {
     };
 
     await Registration.upsert(registrationRecord, {
-      conflictFields: ['mecBookingId']
+      conflictFields: ['sourceUrl', 'mecBookingId']
     });
 
-    console.log(`✅ Booking ${booking_id} synced for event: ${event.title}`);
+    console.log(`✅ Booking ${booking_id} synced from ${site_url} for event: ${event.title}`);
   } catch (error) {
     console.error('Error handling booking webhook:', error);
   }
 }
 
-async function handleBookingCancellation(data) {
+async function handleBookingCancellation(data, site_url) {
   try {
     const { booking_id } = data;
     
     const deleted = await Registration.destroy({
-      where: { mecBookingId: String(booking_id) }
+      where: { 
+        mecBookingId: String(booking_id),
+        sourceUrl: site_url
+      }
     });
 
     if (deleted) {
-      console.log(`✅ Booking ${booking_id} removed from database`);
+      console.log(`✅ Booking ${booking_id} from ${site_url} removed from database`);
     }
   } catch (error) {
     console.error('Error handling booking cancellation:', error);
   }
 }
 
-async function handleCheckin(data) {
+async function handleCheckin(data, site_url) {
   try {
     const { booking_id } = data;
     
     const registration = await Registration.findOne({
-      where: { mecBookingId: String(booking_id) }
+      where: { 
+        mecBookingId: String(booking_id),
+        sourceUrl: site_url
+      }
     });
 
     if (registration) {
@@ -203,7 +217,7 @@ async function handleCheckin(data) {
         checkedIn: true,
         checkedInAt: new Date()
       });
-      console.log(`✅ Attendee checked in: ${registration.attendeeName}`);
+      console.log(`✅ Attendee checked in from ${site_url}: ${registration.attendeeName}`);
     }
   } catch (error) {
     console.error('Error handling checkin:', error);

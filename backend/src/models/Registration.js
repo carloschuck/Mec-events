@@ -9,8 +9,12 @@ const Registration = sequelize.define('Registration', {
   },
   mecBookingId: {
     type: DataTypes.STRING,
-    unique: true,
     comment: 'Booking ID from MEC WordPress plugin'
+  },
+  sourceUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    comment: 'WordPress site URL where booking originates'
   },
   eventId: {
     type: DataTypes.INTEGER,
@@ -84,9 +88,15 @@ const Registration = sequelize.define('Registration', {
   timestamps: true,
   indexes: [
     { fields: ['eventId'] },
+    { fields: ['sourceUrl'] },
     { fields: ['attendeeEmail'] },
     { fields: ['checkedIn'] },
-    { fields: ['registrationDate'] }
+    { fields: ['registrationDate'] },
+    {
+      unique: true,
+      fields: ['sourceUrl', 'mecBookingId'],
+      name: 'unique_booking_per_site'
+    }
   ]
 });
 

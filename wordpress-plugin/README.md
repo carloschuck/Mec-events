@@ -8,8 +8,13 @@ A WordPress plugin that sends Modern Events Calendar (MEC) event and booking dat
 - ✅ Booking notifications (completed, canceled, confirmed)
 - ✅ Attendee check-in tracking
 - ✅ Secure webhook signing with HMAC SHA-256
+- ✅ **Multi-site support** - Install on multiple WordPress sites
 - ✅ Test webhook functionality
 - ✅ Easy WordPress admin configuration
+
+## Multi-Site Support
+
+This plugin supports installation on **multiple WordPress sites**, allowing you to aggregate events from different sources into a single central system. Each site's events are uniquely identified by their source URL, preventing conflicts.
 
 ## Installation
 
@@ -52,6 +57,23 @@ A WordPress plugin that sends Modern Events Calendar (MEC) event and booking dat
 1. In the settings page, click `Send Test Webhook`
 2. You should see a success message
 3. Check your backend logs to confirm receipt
+
+## Installing on Multiple Sites
+
+You can install this plugin on **multiple WordPress sites** to aggregate events from different sources:
+
+1. **Install the plugin on each WordPress site** following the installation steps above
+2. **Use the same webhook URL** for all sites (e.g., `https://your-backend.com/api/webhooks/mec`)
+3. **Use the same webhook secret** for all sites (configured in your backend `WEBHOOK_SECRET` env variable)
+4. Each site will automatically be identified by its `site_url` value
+
+### How Multi-Site Works
+
+- Events are uniquely identified by **source URL + event ID**
+- Bookings are uniquely identified by **source URL + booking ID**
+- No conflicts between events with the same ID from different sites
+- The backend tracks which site each event/booking came from
+- All sites send to the same webhook endpoint
 
 ## Webhook Events
 

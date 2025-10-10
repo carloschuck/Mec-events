@@ -71,9 +71,12 @@ class MECService {
     }
   }
 
-  async syncEvents() {
+  async syncEvents(sourceUrl = null) {
     try {
-      console.log('🔄 Syncing events from MEC...');
+      // Determine source URL - use provided URL or extract from base URL
+      const site_url = sourceUrl || this.baseURL || 'unknown';
+      
+      console.log(`🔄 Syncing events from MEC (${site_url})...`);
       const mecEvents = await this.fetchEvents();
 
       if (!mecEvents || !Array.isArray(mecEvents)) {
@@ -88,6 +91,7 @@ class MECService {
         try {
           const eventData = {
             mecEventId: String(mecEvent.id),
+            sourceUrl: site_url,
             title: mecEvent.title || mecEvent.name || 'Untitled Event',
             description: mecEvent.description || mecEvent.content || '',
             startDate: new Date(mecEvent.start || mecEvent.start_date),
@@ -102,7 +106,7 @@ class MECService {
           };
 
           await Event.upsert(eventData, {
-            conflictFields: ['mecEventId']
+            conflictFields: ['sourceUrl', 'mecEventId']
           });
 
           synced++;
@@ -112,7 +116,7 @@ class MECService {
         }
       }
 
-      console.log(`✅ Synced ${synced} events, ${errors} errors`);
+      console.log(`✅ Synced ${synced} events from ${site_url}, ${errors} errors`);
       return { synced, errors };
     } catch (error) {
       console.error('Error in syncEvents:', error.message);
@@ -120,9 +124,12 @@ class MECService {
     }
   }
 
-  async syncBookings() {
+  async syncBookings(sourceUrl = null) {
     try {
-      console.log('🔄 Syncing bookings from MEC...');
+      // Determine source URL - use provided URL or extract from base URL
+      const site_url = sourceUrl || this.baseURL || 'unknown';
+      
+      console.log(`🔄 Syncing bookings from MEC (${site_url})...`);
       const mecBookings = await this.fetchBookings();
 
       if (!mecBookings || !Array.isArray(mecBookings)) {
@@ -135,19 +142,23 @@ class MECService {
 
       for (const booking of mecBookings) {
         try {
-          // Find the corresponding event in our database
+          // Find the corresponding event in our database from the same source
           const event = await Event.findOne({
-            where: { mecEventId: String(booking.event_id) }
+            where: { 
+              mecEventId: String(booking.event_id),
+              sourceUrl: site_url
+            }
           });
 
           if (!event) {
-            console.log(`Event not found for booking ${booking.id}`);
+            console.log(`Event not found for booking ${booking.id} from ${site_url}`);
             errors++;
             continue;
           }
 
           const registrationData = {
             mecBookingId: String(booking.id),
+            sourceUrl: site_url,
             eventId: event.id,
             attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
             attendeeEmail: booking.email,
@@ -158,7 +169,7 @@ class MECService {
           };
 
           await Registration.upsert(registrationData, {
-            conflictFields: ['mecBookingId']
+            conflictFields: ['sourceUrl', 'mecBookingId']
           });
 
           synced++;
@@ -168,7 +179,7 @@ class MECService {
         }
       }
 
-      console.log(`✅ Synced ${synced} bookings, ${errors} errors`);
+      console.log(`✅ Synced ${synced} bookings from ${site_url}, ${errors} errors`);
       return { synced, errors };
     } catch (error) {
       console.error('Error in syncBookings:', error.message);
@@ -176,10 +187,10 @@ class MECService {
     }
   }
 
-  async syncAll() {
+  async syncAll(sourceUrl = null) {
     try {
-      const eventsResult = await this.syncEvents();
-      const bookingsResult = await this.syncBookings();
+      const eventsResult = await this.syncEvents(sourceUrl);
+      const bookingsResult = await this.syncBookings(sourceUrl);
 
       return {
         events: eventsResult,
