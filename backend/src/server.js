@@ -71,8 +71,24 @@ const startServer = async () => {
     console.log('✅ Database connection established successfully');
 
     // Sync database models
-    await sequelize.sync({ force: false });
-    console.log('✅ Database models synced');
+    // Skip sync if DB_SKIP_SYNC is set (for managed databases with permission restrictions)
+    if (process.env.DB_SKIP_SYNC !== 'true') {
+      if (process.env.NODE_ENV === 'production') {
+        // In production, use alter to modify existing tables
+        try {
+          await sequelize.sync({ alter: true });
+          console.log('✅ Database models synchronized');
+        } catch (syncError) {
+          console.warn('⚠️  Database sync failed (this is normal for managed databases):', syncError.message);
+          console.log('ℹ️  Skipping database sync. Tables should be created manually or via migrations.');
+        }
+      } else {
+        await sequelize.sync({ force: false });
+        console.log('✅ Database models synced');
+      }
+    } else {
+      console.log('ℹ️  Database sync skipped (DB_SKIP_SYNC=true)');
+    }
 
     // Start server
     app.listen(PORT, () => {
