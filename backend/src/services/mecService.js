@@ -93,12 +93,18 @@ class MECService {
       const site_url = sourceUrl || this.baseURL || 'unknown';
       
       console.log(`🔄 Syncing events from MEC (${site_url})...`);
+      console.log(`🔍 MEC API URL: ${this.baseURL}`);
+      console.log(`🔍 API Key configured: ${!!this.apiKey}`);
       const mecEvents = await this.fetchEvents();
 
       if (!mecEvents || !Array.isArray(mecEvents)) {
         console.log('No events found or invalid response');
+        console.log('🔍 mecEvents type:', typeof mecEvents);
+        console.log('🔍 mecEvents value:', mecEvents);
         return { synced: 0, errors: 0 };
       }
+
+      console.log(`🔍 Found ${mecEvents.length} events to sync`);
 
       let synced = 0;
       let errors = 0;
