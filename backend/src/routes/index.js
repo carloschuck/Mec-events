@@ -20,6 +20,15 @@ router.get('/auth/test', (req, res) => {
   });
 });
 
+// Simple test route
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Test route working',
+    timestamp: new Date().toISOString()
+  });
+});
+
 console.log('✅ Simple auth routes created');
 
 // Health check endpoint
