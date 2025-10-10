@@ -108,19 +108,24 @@ class MECService {
           // Extract event data from MEC API format
           const eventId = mecEvent.ID || mecEvent.id;
           const eventData = mecEvent.data || mecEvent;
+          const eventDate = mecEvent.date; // This is the date key from the events object
+          
+          // Parse dates from timestamps
+          const startDate = eventData.time?.start_timestamp ? new Date(eventData.time.start_timestamp * 1000) : null;
+          const endDate = eventData.time?.end_timestamp ? new Date(eventData.time.end_timestamp * 1000) : null;
           
           const eventRecord = {
             mecEventId: String(eventId),
             sourceUrl: site_url,
-            title: eventData.title || eventData.post_title || 'Untitled Event',
-            description: eventData.content || eventData.post_content || '',
-            startDate: eventData.start_date ? new Date(`${eventData.start_date}T${eventData.start_time || '00:00:00'}`) : null,
-            endDate: eventData.end_date ? new Date(`${eventData.end_date}T${eventData.end_time || '23:59:59'}`) : null,
-            location: eventData.location || eventData.venue || '',
-            address: eventData.address || '',
-            capacity: parseInt(eventData.total_capacity || eventData.capacity || 0),
-            imageUrl: eventData.featured_image_url || eventData.image || '',
-            status: this.determineEventStatus(eventData),
+            title: eventData.title || eventData.post?.post_title || 'Untitled Event',
+            description: eventData.content || eventData.post?.post_content || '',
+            startDate: startDate,
+            endDate: endDate,
+            location: eventData.meta?.mec_location_id ? `Location ID: ${eventData.meta.mec_location_id}` : '',
+            address: '',
+            capacity: parseInt(eventData.mec?.total_capacity || eventData.mec?.capacity || 0),
+            imageUrl: eventData.featured_image || eventData.thumbnails?.full || '',
+            status: this.determineEventStatus(eventData, startDate, endDate),
             metadata: mecEvent,
             lastSyncedAt: new Date()
           };
@@ -224,10 +229,8 @@ class MECService {
     }
   }
 
-  determineEventStatus(mecEvent) {
+  determineEventStatus(mecEvent, startDate, endDate) {
     const now = new Date();
-    const startDate = new Date(mecEvent.start || mecEvent.start_date);
-    const endDate = mecEvent.end || mecEvent.end_date ? new Date(mecEvent.end || mecEvent.end_date) : null;
 
     if (mecEvent.status === 'cancelled') {
       return 'cancelled';
@@ -237,7 +240,7 @@ class MECService {
       return 'completed';
     }
 
-    if (now >= startDate && (!endDate || now <= endDate)) {
+    if (startDate && now >= startDate && (!endDate || now <= endDate)) {
       return 'ongoing';
     }
 
