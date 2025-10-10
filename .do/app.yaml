@@ -63,6 +63,7 @@ services:
         type: SECRET
       - key: DB_SKIP_SYNC
         value: "true"
+        scope: RUN_AND_BUILD_TIME
 
   - name: frontend
     github:
