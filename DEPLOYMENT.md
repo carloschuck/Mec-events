@@ -32,99 +32,107 @@
 - [ ] Check all dashboard analytics load
 - [ ] Test on mobile devices
 
-## DigitalOcean App Platform
+## DigitalOcean App Platform ✅ DEPLOYED
 
-### 1. Prepare Repository
+### 1. Repository Setup ✅
 ```bash
 git add .
 git commit -m "Production ready"
 git push origin main
 ```
 
-### 2. Create App
-1. Log into DigitalOcean
-2. Apps → Create App
-3. Connect to GitHub repository
-4. Select repository and branch
+### 2. App Configuration ✅
+- **App Name**: `mec-events-app`
+- **Region**: `sfo3` (San Francisco)
+- **Repository**: `carloschuck/Mec-events`
+- **Branch**: `main`
+- **Auto-deploy**: Enabled
 
-### 3. Configure Components
+### 3. Components ✅
 
 **Database:**
-- Add PostgreSQL database
-- Note credentials for environment variables
+- **Type**: External PostgreSQL (DigitalOcean Managed Database)
+- **Host**: `mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com`
+- **Port**: `25060`
+- **Database**: `defaultdb`
+- **User**: `doadmin`
+- **SSL**: Required
 
 **Backend Service:**
-- Name: mec-backend
-- Environment: Docker
-- Dockerfile path: backend/Dockerfile
-- HTTP Port: 5000
-- Health Check: /api/health
+- **Name**: `backend`
+- **Dockerfile**: `backend/Dockerfile`
+- **HTTP Port**: `5000`
+- **Health Check**: `/api/health`
+- **Instance**: `basic-xxs`
 
 **Frontend Service:**
-- Name: mec-frontend
-- Environment: Docker
-- Dockerfile path: frontend/Dockerfile
-- HTTP Port: 80
+- **Name**: `frontend`
+- **Dockerfile**: `frontend/Dockerfile`
+- **HTTP Port**: `8080`
+- **Instance**: `basic-xxs`
 
-### 4. Environment Variables
+### 4. Environment Variables ✅
 
-Add these to backend service:
+**Backend Service:**
 ```
 NODE_ENV=production
-JWT_SECRET=<your-strong-secret>
-WEBHOOK_SECRET=<your-webhook-secret>
+PORT=5000
+JWT_SECRET=<encrypted-secret>
+JWT_EXPIRES_IN=7d
+WEBHOOK_SECRET=<encrypted-secret>
 DEFAULT_SOURCE_URL=https://housesoflight.org
 MEC_API_URL=https://housesoflight.org/wp-json/mec/v1.0
-CLIENT_URL=https://your-app.ondigitalocean.app
-DB_HOST=<db-host>
-DB_PORT=25060
-DB_NAME=<db-name>
-DB_USER=<db-user>
-DB_PASSWORD=<db-password>
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=<your-email>
-SMTP_PASS=<app-password>
-EMAIL_FROM=MEC Dashboard <your-email>
+CLIENT_URL=${APP_URL}
 ORG_NAME=Houses of Light
+SYNC_CRON_SCHEDULE=0 */3 * * *
+REMINDER_CRON_SCHEDULE=0 9 * * *
+DB_HOST=mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com
+DB_PORT=25060
+DB_NAME=defaultdb
+DB_USER=doadmin
+DB_PASSWORD=<encrypted-secret>
+DB_SKIP_SYNC=true
 ```
 
-Add to frontend service:
+**Frontend Service:**
 ```
-VITE_API_URL=https://your-backend-url/api
+VITE_API_URL=${APP_URL}/api
 ```
 
-### 5. Deploy
-1. Click "Deploy"
-2. Wait for build and deployment
-3. Note the app URL
+### 5. Deployment Status ✅
+- **App URL**: `https://mec-events-app-hey4v.ondigitalocean.app`
+- **Status**: ACTIVE
+- **Health**: Both services HEALTHY
+- **Last Deployed**: Successfully deployed
 
-### 6. Post-Deployment
+### 6. Post-Deployment Setup ✅
 
-**First Time Deployment:**
+**Database Initialization:**
 ```bash
-# SSH into backend container via App Platform console
-# Seed database
-npm run seed
+# Run via API endpoint (recommended)
+curl -X POST https://mec-events-app-hey4v.ondigitalocean.app/api/setup-db
+
+# Or via DigitalOcean console
+cd /app && node src/scripts/setup-database.js
 ```
 
-Or use DigitalOcean's console to run:
-```bash
-cd /app && npm run seed
-```
-
-**Upgrading Existing Deployment (Multi-Site Support):**
-```bash
-# If you already have data and are adding multi-site support
-# Run the migration script
-cd /app && node src/scripts/migrate-multi-site.js
-```
+**Admin User Created:**
+- **Email**: `admin@housesoflight.org`
+- **Password**: `admin123`
+- **Role**: `admin`
+- **Status**: Active and verified
 
 **Configure WordPress Plugin:**
 1. Install the MEC Webhook Bridge plugin on your WordPress site(s)
-2. Configure webhook URL: `https://your-app.ondigitalocean.app/api/webhooks/mec`
+2. Configure webhook URL: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
 3. Set webhook secret to match `WEBHOOK_SECRET` env variable
 4. Enable webhooks and test
+
+**Plugin Configuration Details:**
+- **Webhook URL**: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
+- **Webhook Secret**: `juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=` (from environment)
+- **Events to Sync**: All MEC events and bookings
+- **Multi-Site Support**: Enabled (each site sends its `site_url`)
 
 See [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md) for detailed multi-site configuration.
 
