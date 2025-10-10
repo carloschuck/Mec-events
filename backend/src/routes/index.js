@@ -1,15 +1,16 @@
 import express from 'express';
-
-const router = express.Router();
-
-// Temporarily comment out route imports to test
-// import authRoutes from './authRoutes.js';
+import authRoutes from './authRoutes.js';
 // import eventRoutes from './eventRoutes.js';
 // import registrationRoutes from './registrationRoutes.js';
 // import dashboardRoutes from './dashboardRoutes.js';
 // import webhookRoutes from './webhookRoutes.js';
 
-// router.use('/auth', authRoutes);
+const router = express.Router();
+
+console.log('🔄 Loading auth routes...');
+router.use('/auth', authRoutes);
+console.log('✅ Auth routes loaded');
+
 // router.use('/events', eventRoutes);
 // router.use('/registrations', registrationRoutes);
 // router.use('/dashboard', dashboardRoutes);
