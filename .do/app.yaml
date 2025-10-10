@@ -1,178 +1,92 @@
-name: mec-events
-region: sfo
+name: mec-events-app
+region: sfo3
 
-# PostgreSQL Database Cluster (CRITICAL - Don't skip this!)
-databases:
-  - name: mec-db
-    engine: PG
-    version: "15"
-    size: db-s-dev-database  # Minimum size: $7/month, 1 vCPU, 1GB RAM, 10GB disk
-    num_nodes: 1
-    production: false  # Set to true for production
-
-# Backend Service
 services:
   - name: backend
-    # GitHub source
     github:
-      repo: yourgithubusername/Mec-events  # REPLACE with your GitHub username
+      repo: carloschuck/Mec-events
       branch: main
       deploy_on_push: true
-    
-    # Build settings
     source_dir: backend
     dockerfile_path: backend/Dockerfile
     
-    # Instance configuration
-    instance_count: 1
-    instance_size_slug: basic-xxs  # Minimum: $5/month, 512MB RAM, 1 vCPU
+    routes:
+      - path: /api
     
-    # HTTP configuration
-    http_port: 5000
-    
-    # Health check
     health_check:
       http_path: /api/health
-      initial_delay_seconds: 30
+      initial_delay_seconds: 60
       period_seconds: 10
       timeout_seconds: 5
       success_threshold: 1
       failure_threshold: 3
     
-    # Environment variables
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    
     envs:
-      # Server
       - key: NODE_ENV
         value: production
       - key: PORT
         value: "5000"
-      
-      # Database (will be auto-populated from database cluster)
-      - key: DB_HOST
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_PORT
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_NAME
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_USER
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_PASSWORD
-        type: SECRET
-        scope: RUN_TIME
-      
-      # JWT (IMPORTANT: Change these!)
       - key: JWT_SECRET
-        value: CHANGEME-generate-a-strong-random-secret-key-here
+        value: lNng1n0bCJhd9HjvkNWvXp05HVQJTN+YC+gD3PcyIKI=
         type: SECRET
-        scope: RUN_TIME
       - key: JWT_EXPIRES_IN
         value: 7d
-      
-      # Webhook (IMPORTANT: Change this!)
       - key: WEBHOOK_SECRET
-        value: CHANGEME-webhook-secret-must-match-wordpress-plugin
+        value: juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=
         type: SECRET
-        scope: RUN_TIME
-      
-      # Multi-site support
       - key: DEFAULT_SOURCE_URL
         value: https://housesoflight.org
-      
-      # MEC API (Optional - only needed if using API sync method)
       - key: MEC_API_URL
         value: https://housesoflight.org/wp-json/mec/v1.0
-      
-      # Client URL (will be set after first deploy)
       - key: CLIENT_URL
         value: ${APP_URL}
-      
-      # Email Configuration (REQUIRED: Set your SMTP details)
-      - key: SMTP_HOST
-        value: smtp.gmail.com
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_SECURE
-        value: "false"
-      - key: SMTP_USER
-        value: your-email@gmail.com  # CHANGE THIS
-        type: SECRET
-        scope: RUN_TIME
-      - key: SMTP_PASS
-        value: your-app-password  # CHANGE THIS
-        type: SECRET
-        scope: RUN_TIME
-      - key: EMAIL_FROM
-        value: MEC Dashboard <your-email@gmail.com>  # CHANGE THIS
-      
-      # Organization
       - key: ORG_NAME
         value: Houses of Light
-      
-      # Cron Schedules
       - key: SYNC_CRON_SCHEDULE
-        value: 0 */3 * * *
+        value: "0 */3 * * *"
       - key: REMINDER_CRON_SCHEDULE
-        value: 0 9 * * *
+        value: "0 9 * * *"
+      # Database connection (will be auto-populated by DigitalOcean)
+      - key: DB_HOST
+        value: ${mec-postgres-db.HOSTNAME}
+      - key: DB_PORT
+        value: ${mec-postgres-db.PORT}
+      - key: DB_NAME
+        value: ${mec-postgres-db.DATABASE}
+      - key: DB_USER
+        value: ${mec-postgres-db.USERNAME}
+      - key: DB_PASSWORD
+        value: ${mec-postgres-db.PASSWORD}
+        type: SECRET
 
-  # Frontend Service
   - name: frontend
-    # GitHub source
     github:
-      repo: yourgithubusername/Mec-events  # REPLACE with your GitHub username
+      repo: carloschuck/Mec-events
       branch: main
       deploy_on_push: true
-    
-    # Build settings
     source_dir: frontend
     dockerfile_path: frontend/Dockerfile
     
-    # Instance configuration
-    instance_count: 1
-    instance_size_slug: basic-xxs  # Minimum: $5/month
-    
-    # HTTP configuration
-    http_port: 80
-    
-    # Routes - this will be your main URL
     routes:
       - path: /
     
-    # Environment variables
-    envs:
-      - key: VITE_API_URL
-        value: ${backend.PUBLIC_URL}/api
-
-# Jobs (run after deployment)
-jobs:
-  - name: db-setup
-    kind: POST_DEPLOY
-    github:
-      repo: yourgithubusername/Mec-events  # REPLACE with your GitHub username
-      branch: main
-    source_dir: backend
-    dockerfile_path: backend/Dockerfile
     instance_count: 1
     instance_size_slug: basic-xxs
-    run_command: npm run seed
+    
     envs:
-      # Same database connection as backend
-      - key: DB_HOST
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_PORT
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_NAME
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_USER
-        type: SECRET
-        scope: RUN_TIME
-      - key: DB_PASSWORD
-        type: SECRET
-        scope: RUN_TIME
+      - key: VITE_API_URL
+        value: ${APP_URL}/api
 
+databases:
+  - name: mec-postgres-db
+    engine: PG
+    version: "15"
+    production: false
+    # Note: Using dev database for initial deployment
+    # To use a managed database cluster instead:
+    # 1. Create a cluster at https://cloud.digitalocean.com/databases
+    # 2. Remove this database section
+    # 3. Update environment variables to point to your cluster
