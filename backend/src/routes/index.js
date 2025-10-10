@@ -1,17 +1,19 @@
 import express from 'express';
-import authRoutes from './authRoutes.js';
-import eventRoutes from './eventRoutes.js';
-import registrationRoutes from './registrationRoutes.js';
-import dashboardRoutes from './dashboardRoutes.js';
-import webhookRoutes from './webhookRoutes.js';
 
 const router = express.Router();
 
-router.use('/auth', authRoutes);
-router.use('/events', eventRoutes);
-router.use('/registrations', registrationRoutes);
-router.use('/dashboard', dashboardRoutes);
-router.use('/webhooks', webhookRoutes);
+// Temporarily comment out route imports to test
+// import authRoutes from './authRoutes.js';
+// import eventRoutes from './eventRoutes.js';
+// import registrationRoutes from './registrationRoutes.js';
+// import dashboardRoutes from './dashboardRoutes.js';
+// import webhookRoutes from './webhookRoutes.js';
+
+// router.use('/auth', authRoutes);
+// router.use('/events', eventRoutes);
+// router.use('/registrations', registrationRoutes);
+// router.use('/dashboard', dashboardRoutes);
+// router.use('/webhooks', webhookRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
