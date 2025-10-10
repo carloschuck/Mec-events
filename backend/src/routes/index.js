@@ -31,6 +31,15 @@ router.get('/test', (req, res) => {
 
 console.log('✅ Simple auth routes created');
 
+// Debug: List all registered routes
+console.log('🔍 Registered routes:');
+router.stack.forEach((layer) => {
+  if (layer.route) {
+    const methods = Object.keys(layer.route.methods).join(', ').toUpperCase();
+    console.log(`  ${methods} ${layer.route.path}`);
+  }
+});
+
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
