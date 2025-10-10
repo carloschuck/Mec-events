@@ -33,7 +33,7 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 
-app.use('/api/', limiter);
+app.use('/api', limiter);
 
 // Body parser middleware
 app.use(express.json());
@@ -47,7 +47,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // API routes
+console.log('🔄 Mounting API routes at /api...');
 app.use('/api', routes);
+console.log('✅ API routes mounted successfully');
 
 // Root endpoint
 app.get('/', (req, res) => {
