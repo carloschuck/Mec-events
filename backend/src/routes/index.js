@@ -1,4 +1,9 @@
 import express from 'express';
+import authRoutes from './authRoutes.js';
+import eventRoutes from './eventRoutes.js';
+import registrationRoutes from './registrationRoutes.js';
+import dashboardRoutes from './dashboardRoutes.js';
+import webhookRoutes from './webhookRoutes.js';
 
 const router = express.Router();
 
@@ -14,22 +19,14 @@ router.get('/health', (req, res) => {
   });
 });
 
-// Simple auth routes for testing
-router.post('/auth/login', (req, res) => {
-  console.log('📝 Login endpoint called with body:', req.body);
-  res.json({
-    success: true,
-    message: 'Login endpoint working',
-    timestamp: new Date().toISOString()
-  });
-});
-
-router.get('/auth/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Auth test endpoint working'
-  });
-});
+// Mount all route modules
+console.log('🔄 Mounting route modules...');
+router.use('/auth', authRoutes);
+router.use('/events', eventRoutes);
+router.use('/registrations', registrationRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/webhooks', webhookRoutes);
+console.log('✅ All route modules mounted successfully');
 
 // Database setup endpoint
 router.post('/setup-db', async (req, res) => {
