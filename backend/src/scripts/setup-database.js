@@ -1,6 +1,5 @@
 import sequelize from '../config/database.js';
 import { User, Event, Registration } from '../models/index.js';
-import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -29,13 +28,12 @@ async function setupDatabase() {
     if (adminUser) {
       console.log(`✅ Admin user already exists: ${adminEmail}`);
     } else {
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      
+      // Let the User model handle password hashing via the beforeCreate hook
       adminUser = await User.create({
         firstName: 'Admin',
         lastName: 'User',
         email: adminEmail,
-        password: hashedPassword,
+        password: adminPassword, // Pass plain password, model will hash it
         role: 'admin',
         isActive: true,
       });
