@@ -46,12 +46,7 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// API routes
-console.log('🔄 Mounting API routes at /api...');
-app.use('/api', routes);
-console.log('✅ API routes mounted successfully');
-
-// Root endpoint
+// Root endpoint (must be before routes to avoid conflict)
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -60,6 +55,16 @@ app.get('/', (req, res) => {
     docs: '/api/health'
   });
 });
+
+// API routes
+console.log('🔄 Mounting API routes at /api...');
+app.use('/api', routes);
+console.log('✅ API routes mounted successfully');
+
+// Also mount routes at root for DigitalOcean routing (since it strips /api prefix)
+console.log('🔄 Mounting API routes at root for DigitalOcean...');
+app.use('/', routes);
+console.log('✅ API routes mounted at root successfully');
 
 // Error handling
 app.use(notFound);
