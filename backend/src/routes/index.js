@@ -53,6 +53,30 @@ router.post('/setup-db', async (req, res) => {
   }
 });
 
+// Delete admin user endpoint (for fixing password issues)
+router.delete('/admin-user', async (req, res) => {
+  try {
+    console.log('🗑️ Deleting admin user...');
+    
+    const { User } = await import('../models/index.js');
+    const deleted = await User.destroy({ 
+      where: { email: 'admin@housesoflight.org' } 
+    });
+    
+    res.json({
+      success: true,
+      message: `Admin user deleted. Rows affected: ${deleted}`
+    });
+  } catch (error) {
+    console.error('❌ Error deleting admin user:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting admin user',
+      error: error.message
+    });
+  }
+});
+
 // Debug: List all registered routes
 console.log('🔍 Registered routes:');
 router.stack.forEach((layer) => {
