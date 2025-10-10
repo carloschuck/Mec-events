@@ -29,9 +29,17 @@ class MECService {
 
   async testConnection() {
     try {
-      const response = await this.axiosInstance.get('/');
+      const response = await this.axiosInstance.get('/events');
       console.log('✅ MEC API connection successful');
-      return { success: true, data: response.data };
+      return { 
+        success: true, 
+        data: {
+          apiUrl: this.baseURL,
+          namespace: 'mec/v1.0',
+          eventsCount: response.data?.events ? Object.keys(response.data.events).length : 0,
+          hasApiKey: !!this.apiKey
+        }
+      };
     } catch (error) {
       console.error('❌ MEC API connection failed:', error.message);
       return { success: false, error: error.message, response: error.response?.data };
