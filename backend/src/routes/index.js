@@ -1,20 +1,26 @@
 import express from 'express';
-import authRoutes from './authRoutes.js';
-// import eventRoutes from './eventRoutes.js';
-// import registrationRoutes from './registrationRoutes.js';
-// import dashboardRoutes from './dashboardRoutes.js';
-// import webhookRoutes from './webhookRoutes.js';
 
 const router = express.Router();
 
-console.log('🔄 Loading auth routes...');
-router.use('/auth', authRoutes);
-console.log('✅ Auth routes loaded');
+// Create a simple auth route directly here to test
+console.log('🔄 Creating simple auth routes...');
+router.post('/auth/login', (req, res) => {
+  console.log('📝 Login route called');
+  res.json({
+    success: true,
+    message: 'Login endpoint working',
+    timestamp: new Date().toISOString()
+  });
+});
 
-// router.use('/events', eventRoutes);
-// router.use('/registrations', registrationRoutes);
-// router.use('/dashboard', dashboardRoutes);
-// router.use('/webhooks', webhookRoutes);
+router.get('/auth/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Auth test endpoint working'
+  });
+});
+
+console.log('✅ Simple auth routes created');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
