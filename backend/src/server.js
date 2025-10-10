@@ -5,7 +5,9 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { sequelize } from './models/index.js';
+console.log('🔄 Importing routes...');
 import routes from './routes/index.js';
+console.log('✅ Routes imported successfully');
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import cronJobs from './cron/jobs.js';
 

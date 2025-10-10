@@ -2,6 +2,8 @@ import express from 'express';
 
 const router = express.Router();
 
+console.log('🔄 Routes module loaded successfully');
+
 // Create a simple auth route directly here to test
 console.log('🔄 Creating simple auth routes...');
 router.post('/auth/login', (req, res) => {
