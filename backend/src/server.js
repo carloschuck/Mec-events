@@ -20,8 +20,16 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-app.use(cors({
+// CORS configuration for webhooks (allow all origins)
+app.use('/api/webhooks', cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-MEC-Signature', 'X-API-Key', 'Authorization'],
+  credentials: false
+}));
+
+// CORS configuration for other API endpoints
+app.use('/api', cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -31,11 +39,6 @@ app.use(cors({
       process.env.CLIENT_URL || 'http://localhost:5173',
       'https://mec-events-app-hey4v.ondigitalocean.app'
     ];
-    
-    // Allow all origins for webhook endpoints
-    if (origin && origin.includes('wordpress') || origin && origin.includes('localhost')) {
-      return callback(null, true);
-    }
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
