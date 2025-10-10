@@ -61,10 +61,8 @@ async function setupDatabase() {
   } catch (error) {
     console.error('❌ Error during database setup:', error);
     throw error; // Re-throw instead of process.exit for API usage
-  } finally {
-    await sequelize.close();
-    console.log('🔌 Database connection closed');
   }
+  // Note: Don't close the connection when used via API - let the server manage it
 }
 
 // Export the function for use in API endpoints
@@ -72,5 +70,8 @@ export { setupDatabase };
 
 // Only run automatically if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  setupDatabase();
+  setupDatabase().finally(async () => {
+    await sequelize.close();
+    console.log('🔌 Database connection closed');
+  });
 }
