@@ -155,6 +155,20 @@ export const getEvent = async (req, res) => {
 
 export const syncEvents = async (req, res) => {
   try {
+    // Check if MEC API is configured
+    const mecApiUrl = process.env.MEC_API_URL;
+    if (!mecApiUrl) {
+      return res.json({
+        success: true,
+        message: 'MEC API not configured. Using webhook sync instead.',
+        data: {
+          events: 0,
+          registrations: 0,
+          method: 'webhook'
+        }
+      });
+    }
+
     const result = await mecService.syncAll();
 
     res.json({
