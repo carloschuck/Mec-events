@@ -11,3 +11,5 @@
 11:41:53 PM [vite] hmr update /src/pages/Login.jsx, /src/index.css
 3:16:32 AM [vite] page reload index.html
 3:16:46 AM [vite] page reload index.html
+3:13:34 PM [vite] hmr update /src/pages/Events.jsx, /src/index.css
+3:14:10 PM [vite] hmr update /src/pages/Events.jsx, /src/index.css
