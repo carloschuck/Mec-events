@@ -17,6 +17,15 @@ const sequelize = new Sequelize(
       min: 0,
       acquire: 30000,
       idle: 10000
+    },
+    // SSL configuration for DigitalOcean managed databases
+    dialectOptions: {
+      ssl: process.env.DB_HOST && process.env.DB_HOST !== 'localhost' && process.env.DB_HOST !== 'postgres'
+        ? {
+            require: true,
+            rejectUnauthorized: false
+          }
+        : false
     }
   }
 );
