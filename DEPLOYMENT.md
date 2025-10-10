@@ -1,62 +1,48 @@
-# Deployment Checklist
+# 🚀 Deployment Guide
 
-## Pre-Deployment
+## ✅ Current Deployment Status
 
-### Security
-- [ ] Change JWT_SECRET to a strong random value
-- [ ] Update all default passwords (admin, staff, database)
-- [ ] Remove demo credentials after creating real accounts
-- [ ] Configure CORS with specific origins (not *)
-- [ ] Enable HTTPS/SSL certificates
-- [ ] Set NODE_ENV=production
+**App URL**: https://mec-events-app-hey4v.ondigitalocean.app  
+**Status**: ACTIVE and HEALTHY  
+**Region**: San Francisco (SFO3)  
+**Deployed**: October 10, 2025  
 
-### Configuration
-- [ ] Configure MEC API URL and credentials (if using API sync)
-- [ ] Set up webhook secret (WEBHOOK_SECRET)
-- [ ] Configure default source URL (DEFAULT_SOURCE_URL)
-- [ ] Set up email (SMTP) configuration
-- [ ] Update organization name and branding
-- [ ] Configure cron schedules for your timezone
-- [ ] Set proper database credentials
-- [ ] Configure CLIENT_URL for production domain
+## 🔑 Login Credentials
 
-### Testing
-- [ ] Test login with admin and staff accounts
-- [ ] Verify webhook endpoint is accessible
-- [ ] Test webhook from WordPress plugin
-- [ ] Verify MEC API sync works (if using API method)
-- [ ] Test multi-site event syncing (if applicable)
-- [ ] Test QR code generation and scanning
-- [ ] Verify email sending (reminder, follow-up)
-- [ ] Test PDF and CSV exports
-- [ ] Check all dashboard analytics load
-- [ ] Test on mobile devices
+- **Email**: `admin@housesoflight.org`
+- **Password**: `admin123`
+- **Role**: Admin
 
-## DigitalOcean App Platform ✅ DEPLOYED
+## 🗄️ Database
 
-### 1. Repository Setup ✅
-```bash
-git add .
-git commit -m "Production ready"
-git push origin main
-```
+- **Type**: DigitalOcean Managed PostgreSQL
+- **Host**: `mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com`
+- **Port**: `25060`
+- **Database**: `defaultdb`
+- **User**: `doadmin`
+- **Status**: Connected and initialized
 
-### 2. App Configuration ✅
-- **App Name**: `mec-events-app`
+## 🔌 WordPress Plugin Configuration
+
+**Webhook URL**: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`  
+**Webhook Secret**: `juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=`
+
+### Plugin Setup Steps:
+1. Download `mec-webhook-bridge.zip` from the project directory
+2. Upload to WordPress via Plugins → Add New → Upload Plugin
+3. Configure the webhook URL and secret above
+4. Enable webhooks and test the connection
+
+## 🏗️ DigitalOcean App Platform Configuration
+
+### App Details
+- **Name**: `mec-events-app`
 - **Region**: `sfo3` (San Francisco)
 - **Repository**: `carloschuck/Mec-events`
 - **Branch**: `main`
 - **Auto-deploy**: Enabled
 
-### 3. Components ✅
-
-**Database:**
-- **Type**: External PostgreSQL (DigitalOcean Managed Database)
-- **Host**: `mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com`
-- **Port**: `25060`
-- **Database**: `defaultdb`
-- **User**: `doadmin`
-- **SSL**: Required
+### Services Configuration
 
 **Backend Service:**
 - **Name**: `backend`
@@ -71,7 +57,7 @@ git push origin main
 - **HTTP Port**: `8080`
 - **Instance**: `basic-xxs`
 
-### 4. Environment Variables ✅
+### Environment Variables
 
 **Backend Service:**
 ```
@@ -99,335 +85,208 @@ DB_SKIP_SYNC=true
 VITE_API_URL=${APP_URL}/api
 ```
 
-### 5. Deployment Status ✅
-- **App URL**: `https://mec-events-app-hey4v.ondigitalocean.app`
-- **Status**: ACTIVE
-- **Health**: Both services HEALTHY
-- **Last Deployed**: Successfully deployed
+### Routing Configuration
 
-### 6. Post-Deployment Setup ✅
-
-**Database Initialization:**
-```bash
-# Run via API endpoint (recommended)
-curl -X POST https://mec-events-app-hey4v.ondigitalocean.app/api/setup-db
-
-# Or via DigitalOcean console
-cd /app && node src/scripts/setup-database.js
+```yaml
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: "/api"
+      component:
+        name: "backend"
+        preserve_path_prefix: true
+    - match:
+        path:
+          prefix: "/"
+      component:
+        name: "frontend"
 ```
 
-**Admin User Created:**
-- **Email**: `admin@housesoflight.org`
-- **Password**: `admin123`
-- **Role**: `admin`
-- **Status**: Active and verified
+## 🧪 Testing Endpoints
 
-**Configure WordPress Plugin:**
-1. Install the MEC Webhook Bridge plugin on your WordPress site(s)
-2. Configure webhook URL: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
-3. Set webhook secret to match `WEBHOOK_SECRET` env variable
-4. Enable webhooks and test
+**Health Check**: `https://mec-events-app-hey4v.ondigitalocean.app/api/health`  
+**Login Test**: `https://mec-events-app-hey4v.ondigitalocean.app/api/auth/login`  
+**Webhook Test**: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
 
-**Plugin Configuration Details:**
-- **Webhook URL**: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
-- **Webhook Secret**: `juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=` (from environment)
-- **Events to Sync**: All MEC events and bookings
-- **Multi-Site Support**: Enabled (each site sends its `site_url`)
+## 📊 Features Available
 
-See [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md) for detailed multi-site configuration.
+- ✅ User authentication and authorization
+- ✅ Event management and synchronization
+- ✅ Registration and check-in system
+- ✅ QR code generation and scanning
+- ✅ Multi-site support
+- ✅ Webhook integration with WordPress MEC
+- ✅ Dashboard and analytics
+- ✅ PDF and CSV exports
+- ✅ Email notifications
 
-## DigitalOcean Droplet
+## 🔧 Deployment Process
 
-### 1. Create Droplet
-- Ubuntu 22.04 LTS
-- Basic plan ($6/month minimum)
-- Choose datacenter region
-- Add SSH key
-
-### 2. Initial Setup
+### 1. Repository Setup
 ```bash
-# SSH into droplet
-ssh root@<droplet-ip>
-
-# Update system
-apt update && apt upgrade -y
-
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Install Docker Compose
-apt install docker-compose -y
-
-# Create non-root user (optional but recommended)
-adduser deployer
-usermod -aG sudo deployer
-usermod -aG docker deployer
+git add .
+git commit -m "Production ready"
+git push origin main
 ```
 
-### 3. Deploy Application
+### 2. DigitalOcean App Creation
+1. Log into DigitalOcean
+2. Apps → Create App
+3. Connect to GitHub repository: `carloschuck/Mec-events`
+4. Select branch: `main`
+5. Configure services and environment variables
+6. Deploy
+
+### 3. Database Setup
+1. Create DigitalOcean Managed PostgreSQL database
+2. Configure connection details in environment variables
+3. Run database initialization via API endpoint:
+   ```bash
+   curl -X POST https://mec-events-app-hey4v.ondigitalocean.app/api/setup-db
+   ```
+
+### 4. WordPress Plugin Configuration
+1. Install the MEC Webhook Bridge plugin
+2. Configure webhook URL and secret
+3. Enable webhooks and test connection
+
+## 🚀 Alternative Deployment Methods
+
+### Docker Compose (Local/Server)
+
 ```bash
 # Clone repository
-git clone <your-repo-url>
+git clone <repository-url>
 cd Mec-events
 
 # Configure environment
-cp backend/.env.example backend/.env
-nano backend/.env  # Edit with production values
-# Make sure to set:
-# - JWT_SECRET
-# - WEBHOOK_SECRET
-# - DEFAULT_SOURCE_URL
-# - Database credentials
-# - Email settings
-
-cp frontend/.env.example frontend/.env
-nano frontend/.env  # Set VITE_API_URL
+cp .env.example .env
+nano .env  # Edit with production values
 
 # Start services
 docker-compose up -d
 
-# Seed database (first time only)
+# Seed database (first time)
 docker-compose exec backend npm run seed
 
-# OR if upgrading existing deployment with multi-site support
-docker-compose exec backend node src/scripts/migrate-multi-site.js
-
 # Check logs
 docker-compose logs -f
 ```
 
-### 4. Configure Firewall
+### Manual Server Setup
+
 ```bash
-# Allow SSH, HTTP, HTTPS
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw enable
+# Install Node.js 18+
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PostgreSQL
+sudo apt-get install postgresql postgresql-contrib
+
+# Clone and setup
+git clone <repository-url>
+cd Mec-events
+
+# Backend setup
+cd backend
+npm install
+cp .env.example .env
+# Edit .env with production values
+npm run seed
+npm start
+
+# Frontend setup (separate terminal)
+cd ../frontend
+npm install
+cp .env.example .env
+npm run build
+# Serve with nginx or similar
 ```
 
-### 5. Set Up Nginx Reverse Proxy (Optional)
-```bash
-# Install nginx
-apt install nginx -y
+## 🔒 Security Configuration
 
-# Create config
-nano /etc/nginx/sites-available/mec-dashboard
+### Environment Variables
+- All secrets are encrypted in DigitalOcean
+- Database connection uses SSL
+- Webhook secret ensures secure communication
+- JWT tokens have expiration
 
-# Add configuration:
-server {
-    listen 80;
-    server_name your-domain.com;
+### SSL/HTTPS
+- Automatic SSL certificates via DigitalOcean
+- All traffic encrypted
+- Required for QR scanner functionality
 
-    location / {
-        proxy_pass http://localhost:5173;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
+### Database Security
+- SSL connection required
+- Strong password authentication
+- Managed database with automatic backups
 
-    location /api {
-        proxy_pass http://localhost:5000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-    }
-}
-
-# Enable site
-ln -s /etc/nginx/sites-available/mec-dashboard /etc/nginx/sites-enabled/
-nginx -t
-systemctl reload nginx
-```
-
-### 6. Set Up SSL with Let's Encrypt
-```bash
-# Install certbot
-apt install certbot python3-certbot-nginx -y
-
-# Get certificate
-certbot --nginx -d your-domain.com
-
-# Auto-renewal is set up automatically
-```
-
-### 7. Set Up Auto-Start
-```bash
-# Add to crontab
-crontab -e
-
-# Add this line:
-@reboot cd /path/to/Mec-events && docker-compose up -d
-```
-
-## Post-Deployment Verification
+## 📈 Monitoring & Maintenance
 
 ### Health Checks
-- [ ] Backend health: https://your-domain.com/api/health
-- [ ] Webhook endpoint: https://your-domain.com/api/webhooks/mec
-- [ ] Frontend loads properly
-- [ ] Login works
-- [ ] Database connection successful
+- Backend health endpoint: `/api/health`
+- Automatic health monitoring in DigitalOcean
+- Service restart on failure
 
-### Functionality Tests
-- [ ] Test webhook from WordPress plugin
-- [ ] Verify events sync from WordPress
-- [ ] Verify registrations sync properly
-- [ ] Test multi-site setup (if using multiple sites)
-- [ ] Create test event
-- [ ] Register test attendee
-- [ ] Generate QR code
-- [ ] Test QR scanner
-- [ ] Export PDF/CSV
-- [ ] Send test email
-- [ ] Check cron jobs are running
+### Logs
+- Access logs via DigitalOcean App Platform
+- Backend logs for debugging
+- Webhook activity logs
 
-### Multi-Site Verification (if applicable)
-- [ ] Install plugin on each WordPress site
-- [ ] Configure each plugin with same webhook URL and secret
-- [ ] Test webhook from each site
-- [ ] Verify events from different sites appear in database
-- [ ] Check `sourceUrl` field is correctly populated
-- [ ] Verify no duplicate events between sites
+### Backups
+- Database backups handled by DigitalOcean
+- Automatic daily backups
+- Point-in-time recovery available
 
-### Monitoring
-- [ ] Set up uptime monitoring (UptimeRobot, StatusCake)
-- [ ] Configure log aggregation
-- [ ] Set up backup schedule
-- [ ] Monitor disk space
-- [ ] Monitor database performance
+## 🐛 Troubleshooting
 
-## Backup Strategy
+### Common Issues
 
-### Database Backups
+**App Won't Start**:
+- Check environment variables are set correctly
+- Verify database connection
+- Check logs in DigitalOcean dashboard
+
+**Database Connection Issues**:
+- Verify database credentials
+- Check SSL connection settings
+- Ensure database is accessible from app
+
+**Webhook Issues**:
+- Verify webhook URL and secret
+- Check WordPress plugin configuration
+- Test webhook endpoint manually
+
+**Frontend Issues**:
+- Check VITE_API_URL is set correctly
+- Verify backend is accessible
+- Check browser console for errors
+
+### Debug Commands
+
 ```bash
-# Manual backup
-docker-compose exec postgres pg_dump -U postgres mec_dashboard > backup.sql
+# Test database connection
+curl -X POST https://mec-events-app-hey4v.ondigitalocean.app/api/setup-db
 
-# Automated daily backups (add to crontab)
-0 2 * * * cd /path/to/Mec-events && docker-compose exec -T postgres pg_dump -U postgres mec_dashboard > /backups/mec_$(date +\%Y\%m\%d).sql
-```
-
-### Application Backups
-```bash
-# Backup docker volumes
-docker-compose down
-tar -czf mec-backup.tar.gz postgres_data/
-docker-compose up -d
-```
-
-## Rollback Plan
-
-### Quick Rollback
-```bash
-# Stop current version
-docker-compose down
-
-# Pull previous version
-git checkout <previous-commit>
-
-# Rebuild and start
-docker-compose up -d --build
-
-# Restore database if needed
-docker-compose exec -T postgres psql -U postgres mec_dashboard < backup.sql
-```
-
-## Scaling Considerations
-
-### Horizontal Scaling
-- Use DigitalOcean Load Balancer
-- Multiple backend instances
-- Shared PostgreSQL database
-- Centralized Redis for sessions (future enhancement)
-
-### Vertical Scaling
-- Upgrade droplet size
-- Increase PostgreSQL resources
-- Optimize database indexes
-- Enable query caching
-
-## Maintenance
-
-### Regular Tasks
-- [ ] Weekly: Review logs for errors
-- [ ] Weekly: Check disk space
-- [ ] Monthly: Update dependencies
-- [ ] Monthly: Review user accounts
-- [ ] Quarterly: Security audit
-- [ ] Quarterly: Database optimization
-
-### Update Procedure
-```bash
-# Backup first!
-docker-compose exec postgres pg_dump -U postgres mec_dashboard > backup.sql
-
-# Pull updates
-git pull origin main
-
-# Check if migration is needed
-# Review CHANGELOG or commit messages for migration requirements
-
-# Run migrations if needed (e.g., for multi-site support)
-docker-compose exec backend node src/scripts/migrate-multi-site.js
-
-# Rebuild and restart
-docker-compose down
-docker-compose up -d --build
-
-# Verify everything works
-docker-compose logs -f
-
-# Test webhook connectivity
-curl -X POST https://your-domain.com/api/webhooks/mec \
+# Test webhook endpoint
+curl -X POST https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec \
   -H "Content-Type: application/json" \
-  -d '{"event_type":"test.webhook","data":{},"site_url":"test"}'
+  -H "X-MEC-Signature: <signature>" \
+  -d '{"event_type":"test.webhook","data":{},"timestamp":"2025-10-10T18:45:00","site_url":"https://housesoflight.org"}'
+
+# Check app health
+curl https://mec-events-app-hey4v.ondigitalocean.app/api/health
 ```
 
-## Troubleshooting Production Issues
+## 📞 Support
 
-### Application Won't Start
-```bash
-# Check logs
-docker-compose logs -f backend
-
-# Check database
-docker-compose logs -f postgres
-
-# Verify environment variables
-docker-compose config
-```
-
-### High CPU/Memory Usage
-```bash
-# Check container stats
-docker stats
-
-# Restart specific service
-docker-compose restart backend
-```
-
-### Database Issues
-```bash
-# Connect to database
-docker-compose exec postgres psql -U postgres mec_dashboard
-
-# Check connections
-SELECT * FROM pg_stat_activity;
-
-# Kill long-running queries
-SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state = 'active';
-```
-
-## Support Contacts
-
-- **Technical Issues:** [Support Email]
-- **MEC API Issues:** Check MEC documentation
-- **DigitalOcean Support:** Open ticket in dashboard
-- **Emergency Contact:** [Phone Number]
+For deployment issues:
+1. Check DigitalOcean App Platform logs
+2. Verify environment variables
+3. Test individual components
+4. Review this documentation
 
 ---
 
-**Remember:** Always backup before making changes in production!
-
+**🎉 Your MEC Events Dashboard is now live and ready to use!**

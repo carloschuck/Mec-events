@@ -1,4 +1,4 @@
-# MEC Dashboard & Check-In App
+# MEC Events Dashboard & Check-In App
 
 A full-stack web application for managing event registrations, analytics, and check-ins for the Modern Events Calendar (MEC) WordPress plugin.
 
@@ -8,356 +8,179 @@ A full-stack web application for managing event registrations, analytics, and ch
 
 ## 🎯 Features
 
-### Core Features
-- **MEC Integration** - Real-time webhook sync & REST API for Modern Events Calendar
+- **MEC Integration** - Real-time webhook sync with Modern Events Calendar
 - **Multi-Site Support** - Aggregate events from multiple WordPress sites
 - **Authentication** - Secure JWT-based auth with Admin and Staff roles
 - **Dashboard** - Analytics overview with KPIs, charts, and trends
-- **Event Management** - View, filter, and monitor events with detailed stats
 - **QR Check-In** - Real-time QR code scanning for attendee check-ins
 - **PDF/CSV Export** - Customizable attendee list exports
 - **Email Notifications** - Automated reminders and follow-up emails
-- **Automated Tasks** - Cron jobs for syncing data and sending reminders
 - **WordPress Plugin** - Bridge plugin for webhook integration
 
-### Tech Stack
+## 🚀 Live Application
 
-#### Backend
-- Node.js + Express
-- PostgreSQL + Sequelize ORM
-- JWT authentication
-- Helmet, CORS, rate limiting
-- Nodemailer for emails
-- node-cron for scheduled tasks
-- QRCode generation
-- PDFKit for PDF exports
+**URL**: https://mec-events-app-hey4v.ondigitalocean.app  
+**Status**: ACTIVE and HEALTHY  
+**Login**: `admin@housesoflight.org` / `admin123`
 
-#### Frontend
-- React 18 + Vite
-- Tailwind CSS
-- React Router
-- Zustand for state management
-- Recharts for analytics
-- html5-qrcode for QR scanning
-- Lucide React icons
-- React Hot Toast for notifications
+## 🏗️ Tech Stack
 
-#### Deployment
-- Docker + Docker Compose
-- PostgreSQL container
-- Nginx for frontend
-- Ready for DigitalOcean deployment
+**Backend**: Node.js + Express + PostgreSQL + Sequelize  
+**Frontend**: React 18 + Vite + Tailwind CSS  
+**Deployment**: DigitalOcean App Platform  
+**Database**: PostgreSQL with SSL  
 
-## 📋 Prerequisites
+## 📦 Quick Start
 
-- **Node.js** 18+ and npm
-- **PostgreSQL** 15+ (or use Docker)
-- **Git**
-- **Docker** (optional, for containerized deployment)
-- **WordPress with MEC** (Modern Events Calendar plugin installed)
-- **Access to install WordPress plugins** (for webhook integration)
+### Local Development
 
-## 🚀 Quick Start
-
-### Option 1: Local Development (Without Docker)
-
-#### 1. Clone the Repository
 ```bash
+# Clone repository
 git clone <repository-url>
 cd Mec-events
-```
 
-#### 2. Set Up Backend
-
-```bash
+# Backend setup
 cd backend
-
-# Install dependencies
 npm install
-
-# Create .env file
 cp .env.example .env
-
 # Edit .env with your configuration
-nano .env
-
-# Run database migrations and seed
 npm run seed
-
-# Start development server
 npm run dev
-```
 
-The backend will run on `http://localhost:5000`
-
-#### 3. Set Up Frontend
-
-```bash
+# Frontend setup (new terminal)
 cd ../frontend
-
-# Install dependencies
 npm install
-
-# Create .env file
 cp .env.example .env
-
-# Start development server
 npm run dev
 ```
 
-The frontend will run on `http://localhost:5173`
+**Access**: http://localhost:5173
 
-#### 4. Access the Application
+### Docker Deployment
 
-Open your browser and navigate to `http://localhost:5173`
-
-**Demo Credentials:**
-- **Admin:** admin@example.com / admin123
-- **Staff:** staff@example.com / staff123
-
-### Option 2: Docker Compose (Recommended for Production)
-
-#### 1. Clone and Configure
 ```bash
-git clone <repository-url>
-cd Mec-events
-
-# Create environment file
+# Configure environment
 cp .env.example .env
+# Edit .env with production values
 
-# Edit configuration
-nano .env
-```
-
-#### 2. Build and Start
-```bash
-# Build and start all services
+# Start services
 docker-compose up -d
 
-# View logs
-docker-compose logs -f
-
-# Seed the database (first time only)
+# Seed database (first time)
 docker-compose exec backend npm run seed
 ```
 
-#### 3. Access
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:5000
-- **API Health:** http://localhost:5000/api/health
+## 🔌 WordPress Integration
 
-#### 4. Stop Services
-```bash
-docker-compose down
+### 1. Download Plugin
+- Download `mec-webhook-bridge.zip` from the project directory
+- Upload to WordPress via Plugins → Add New → Upload Plugin
 
-# Remove volumes (warning: deletes all data)
-docker-compose down -v
-```
+### 2. Configure Plugin
+- **Webhook URL**: `https://mec-events-app-hey4v.ondigitalocean.app/api/webhooks/mec`
+- **Webhook Secret**: `juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=`
+- **Enable Webhooks**: ✅ Check the box
+- **Test**: Click "Send Test Webhook"
 
-## 🔧 Configuration
+### 3. Multi-Site Setup
+Install the plugin on multiple WordPress sites using the same webhook URL and secret. Each site will automatically send its `site_url` for proper event tracking.
+
+## ⚙️ Configuration
 
 ### Backend Environment Variables
 
-Create `backend/.env` file:
-
 ```env
 # Server
-NODE_ENV=development
+NODE_ENV=production
 PORT=5000
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=https://your-app.ondigitalocean.app
 
 # Database
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=mec_dashboard
-DB_USER=postgres
-DB_PASSWORD=postgres
+DB_HOST=your-db-host
+DB_PORT=25060
+DB_NAME=defaultdb
+DB_USER=doadmin
+DB_PASSWORD=your-db-password
 
 # JWT
-JWT_SECRET=your-super-secret-jwt-key-change-this
+JWT_SECRET=your-super-secret-jwt-key
 JWT_EXPIRES_IN=7d
 
-# Webhook (Recommended)
-WEBHOOK_SECRET=your-webhook-secret-change-in-production
+# Webhook
+WEBHOOK_SECRET=juzl3DuBkbGej3c7+BTWVKdQIydUJuVZJrMld4GlZac=
 DEFAULT_SOURCE_URL=https://housesoflight.org
-
-# MEC API (Optional, for API-based sync)
-MEC_API_URL=https://housesoflight.org/wp-json/mec/v1.0
-MEC_API_AUTH_USER=
-MEC_API_AUTH_PASS=
 
 # Email (Gmail example)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_SECURE=false
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 EMAIL_FROM=MEC Dashboard <your-email@gmail.com>
 
 # Organization
 ORG_NAME=Houses of Light
-ORG_LOGO_URL=https://housesoflight.org/logo.png
-
-# Cron Schedules
-SYNC_CRON_SCHEDULE=0 */3 * * *      # Every 3 hours
-REMINDER_CRON_SCHEDULE=0 9 * * *    # 9 AM daily
 ```
 
 ### Frontend Environment Variables
 
-Create `frontend/.env` file:
-
 ```env
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=https://your-app.ondigitalocean.app/api
 ```
 
-### Email Setup (Gmail)
+## 🚢 Deployment
 
-1. Go to Google Account Settings
-2. Enable 2-Factor Authentication
-3. Generate an App Password
-4. Use the app password in `SMTP_PASS`
+### DigitalOcean App Platform (Current Setup)
 
-## 📁 Project Structure
+1. **App Configuration**:
+   - **Name**: `mec-events-app`
+   - **Region**: San Francisco (SFO3)
+   - **Repository**: `carloschuck/Mec-events`
+   - **Auto-deploy**: Enabled
 
-```
-Mec-events/
-├── backend/
-│   ├── src/
-│   │   ├── config/         # Database and app config
-│   │   ├── models/         # Sequelize models
-│   │   ├── controllers/    # Route controllers
-│   │   ├── routes/         # API routes
-│   │   ├── middleware/     # Auth, validation, errors
-│   │   ├── services/       # Business logic (MEC, QR, Email, PDF)
-│   │   ├── cron/           # Scheduled jobs
-│   │   ├── scripts/        # Seed and migration scripts
-│   │   └── server.js       # Entry point
-│   ├── package.json
-│   ├── .env.example
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── pages/          # Page components
-│   │   ├── lib/            # API client
-│   │   ├── store/          # Zustand store
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   ├── .env.example
-│   ├── Dockerfile
-│   └── nginx.conf
-├── docker-compose.yml
-├── .env.example
-└── README.md
-```
+2. **Services**:
+   - **Backend**: Node.js service (port 5000)
+   - **Frontend**: React service (port 8080)
+   - **Database**: External PostgreSQL managed database
 
-## 🔗 WordPress Integration
+3. **Environment Variables**: All configured and encrypted in DigitalOcean
 
-### Webhook Method (Recommended)
+4. **Status**: ✅ ACTIVE and HEALTHY
 
-The system uses a WordPress plugin to send real-time webhooks when events and bookings are created/updated.
+### Manual Deployment
 
-#### Setup Instructions:
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions.
 
-1. **Install the WordPress plugin**
-   - Upload `wordpress-plugin/mec-webhook-bridge.php` to your WordPress site
-   - Activate the plugin
-
-2. **Configure the plugin**
-   - Go to `Settings → MEC Webhook Bridge`
-   - Webhook URL: `https://your-backend.com/api/webhooks/mec`
-   - Webhook Secret: (same as `WEBHOOK_SECRET` in backend `.env`)
-   - Enable webhooks
-
-3. **Test the webhook**
-   - Click "Send Test Webhook" button
-   - Check backend logs for confirmation
-
-**Multi-Site Setup:** Install the plugin on multiple WordPress sites to aggregate events. See [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md) for details.
-
-### API Method (Alternative)
-
-Alternatively, sync via MEC REST API with cron jobs. Configure `MEC_API_URL` in `.env`.
-
-## 🔌 API Endpoints
-
-### Webhooks
-- `POST /api/webhooks/mec` - Receive MEC webhooks
+## 🔗 API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register new user (admin only)
 - `POST /api/auth/login` - Login
 - `GET /api/auth/me` - Get current user
-- `PUT /api/auth/profile` - Update profile
-- `PUT /api/auth/change-password` - Change password
 
 ### Events
-- `GET /api/events` - List events (with filters)
+- `GET /api/events` - List events
 - `GET /api/events/:id` - Get event details
-- `GET /api/events/:id/analytics` - Get event analytics
-- `POST /api/events/sync` - Sync from MEC API (admin only)
 - `GET /api/events/:id/export/pdf` - Export attendees PDF
-- `GET /api/events/:id/export/csv` - Export attendees CSV
 
 ### Registrations
 - `GET /api/registrations` - List registrations
-- `GET /api/registrations/:id` - Get registration details
 - `POST /api/registrations/:id/checkin` - Check in attendee
 - `POST /api/registrations/checkin/qr` - Check in via QR code
-- `POST /api/registrations/:id/undo-checkin` - Undo check-in
-- `GET /api/registrations/:id/qrcode` - Generate QR code
-- `POST /api/registrations/:id/reminder` - Send reminder email
 
-### Dashboard
-- `GET /api/dashboard/stats` - Get dashboard statistics
-
-## 🤖 Automated Tasks (Cron Jobs)
-
-The backend runs automated scheduled tasks:
-
-1. **MEC Sync** (Every 3 hours by default, optional if using webhooks)
-   - Syncs events and bookings from MEC API
-   - Updates local database
-   - Only needed if not using webhook method
-
-2. **Event Reminders** (9 AM daily by default)
-   - Sends reminder emails 24 hours before events
-   - Only to attendees who haven't been sent reminders
-
-3. **Follow-up Emails** (10 AM daily)
-   - Sends thank you emails after events
-   - Only to checked-in attendees
-
-4. **Status Updates** (Midnight daily)
-   - Updates event statuses (upcoming → ongoing → completed)
-
-Configure schedules in `.env`:
-```env
-SYNC_CRON_SCHEDULE=0 */3 * * *      # Cron expression (optional with webhooks)
-REMINDER_CRON_SCHEDULE=0 9 * * *
-```
-
-**Note:** With webhook integration, real-time sync happens automatically. The cron sync job is optional as a backup.
-
-[Cron Expression Guide](https://crontab.guru/)
+### Webhooks
+- `POST /api/webhooks/mec` - Receive MEC webhooks
 
 ## 🎨 User Roles
 
 ### Admin
 - Full access to all features
-- Sync events from MEC
 - Export data (PDF/CSV)
 - Send email notifications
 - View analytics and reports
-- Check in attendees
 
 ### Staff
 - View events and registrations
 - Check in attendees via QR scanner
 - View dashboard
-- Limited export capabilities
 
 ## 📱 QR Code Check-In
 
@@ -365,7 +188,6 @@ REMINDER_CRON_SCHEDULE=0 9 * * *
 2. **Scan at Event** - Use the built-in scanner on the Check-In page
 3. **Instant Feedback** - Real-time success/error messages
 4. **Duplicate Prevention** - Can't check in twice
-5. **Staff Tracking** - Records which staff member performed check-in
 
 ## 📊 Analytics & Reports
 
@@ -374,165 +196,81 @@ REMINDER_CRON_SCHEDULE=0 9 * * *
 - Check-in rate percentage
 - 30-day registration trend
 - Top events by registration
-- Upcoming events overview
 
 ### Event Details
 - Registration trend chart
 - Check-in status pie chart
 - Attendee list with search/filter
-- Capacity tracking
 - Export functionality
 
-## 🚢 Deployment
+## 🔒 Security
 
-Comprehensive deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
-
-Multi-site setup guide: [MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md)
-
-### Quick Deployment Steps
-
-### DigitalOcean App Platform
-
-1. **Create New App**
-   - Connect GitHub repository
-   - Select `docker-compose.yml`
-
-2. **Configure Environment**
-   - Add all required environment variables (including `WEBHOOK_SECRET`)
-   - Set production database credentials
-
-3. **Deploy**
-   - App Platform handles build and deployment
-   - Automatic SSL certificates
-   - Auto-scaling support
-
-4. **Configure WordPress**
-   - Install MEC Webhook Bridge plugin
-   - Point webhook URL to your deployed backend
-   - Test webhook connectivity
-
-### DigitalOcean Droplet
-
-```bash
-# SSH into droplet
-ssh root@your-droplet-ip
-
-# Install Docker & Docker Compose
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-
-# Clone repository
-git clone <repository-url>
-cd Mec-events
-
-# Configure environment
-cp .env.example .env
-nano .env
-
-# Start services
-docker-compose up -d
-
-# Seed database (first time)
-docker-compose exec backend npm run seed
-
-# View logs
-docker-compose logs -f
-```
-
-## 🔒 Security Best Practices
-
-1. **Change default passwords** - Update JWT secret and admin credentials
-2. **Use strong passwords** - Minimum 12 characters with mixed case, numbers, symbols
-3. **Enable HTTPS** - Use SSL certificates in production
-4. **Secure email** - Use app-specific passwords, not main account password
-5. **Rate limiting** - Already configured (100 requests per 15 minutes)
-6. **CORS** - Configure allowed origins in production
-7. **Environment variables** - Never commit `.env` files
-8. **Database** - Use strong PostgreSQL password in production
+- JWT authentication with secure tokens
+- HMAC SHA-256 webhook signature verification
+- Rate limiting (100 requests per 15 minutes)
+- HTTPS/SSL encryption
+- Environment variable encryption in DigitalOcean
 
 ## 🐛 Troubleshooting
 
-### Backend won't start
-- Check PostgreSQL is running: `pg_isready`
-- Verify database credentials in `.env`
-- Check port 5000 is available: `lsof -i :5000`
+### Common Issues
 
-### Frontend build errors
-- Clear node_modules: `rm -rf node_modules package-lock.json && npm install`
-- Check Node.js version: `node --version` (needs 18+)
+**Login Problems**:
+- Verify credentials: `admin@housesoflight.org` / `admin123`
+- Check if user exists in database
 
-### QR Scanner not working
+**Webhook Issues**:
+- Verify webhook URL and secret are correct
+- Check WordPress plugin is activated
+- Test webhook connection
+
+**QR Scanner Issues**:
 - Ensure HTTPS (required for camera access)
 - Grant browser camera permissions
-- Check camera is not in use by another app
 
-### Email not sending
+**Email Issues**:
 - Verify SMTP credentials
-- Check firewall allows port 587/465
 - Use app-specific password for Gmail
-- Test with: `npm run test-email` (create this script if needed)
 
-### Docker issues
-- Restart services: `docker-compose restart`
-- Rebuild containers: `docker-compose up -d --build`
-- Check logs: `docker-compose logs -f backend`
-- Clean up: `docker system prune -a`
+## 📁 Project Structure
 
-## 📝 Development Scripts
-
-### Backend
-```bash
-npm start          # Start production server
-npm run dev        # Start dev server with nodemon
-npm run seed       # Seed database with sample data
-
-# Migration scripts
-node src/scripts/migrate-multi-site.js  # Add multi-site support to existing DB
 ```
-
-### Frontend
-```bash
-npm run dev        # Start dev server
-npm run build      # Build for production
-npm run preview    # Preview production build
+Mec-events/
+├── backend/                 # Node.js + Express API
+│   ├── src/
+│   │   ├── controllers/     # Route controllers
+│   │   ├── models/         # Database models
+│   │   ├── routes/         # API routes
+│   │   ├── services/       # Business logic
+│   │   └── server.js       # Entry point
+│   └── Dockerfile
+├── frontend/               # React + Vite app
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Page components
+│   │   └── store/          # State management
+│   └── Dockerfile
+├── wordpress-plugin/       # WordPress bridge plugin
+│   └── mec-webhook-bridge.php
+├── .do/                    # DigitalOcean config
+│   └── app.yaml
+└── docker-compose.yml
 ```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-MIT License - See LICENSE file for details
 
 ## 📚 Documentation
 
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Comprehensive deployment guide
-- **[MULTI-SITE-SETUP.md](MULTI-SITE-SETUP.md)** - Multi-site configuration
-- **[wordpress-plugin/README.md](wordpress-plugin/README.md)** - WordPress plugin docs
-- **[PROJECT-SUMMARY.md](PROJECT-SUMMARY.md)** - Technical overview
-- **[LOCAL-TESTING-GUIDE.md](LOCAL-TESTING-GUIDE.md)** - Local development setup
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Detailed deployment guide
+- **[WORDPRESS-PLUGIN-SETUP.md](WORDPRESS-PLUGIN-SETUP.md)** - Plugin installation guide
 
 ## 💬 Support
 
-For issues, questions, or contributions:
+For issues or questions:
+- Check the troubleshooting section above
+- Review the deployment documentation
 - Open an issue on GitHub
-- Email: support@example.com
-- Review documentation above
-
-## 🙏 Acknowledgments
-
-- Modern Events Calendar for the WordPress plugin
-- DigitalOcean for hosting platform
-- All contributors and testers
 
 ---
 
 **Built with ❤️ for Houses of Light**
 
 Version 1.0.0 - October 2025
-
