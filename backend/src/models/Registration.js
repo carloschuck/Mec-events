@@ -1,0 +1,94 @@
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
+
+const Registration = sequelize.define('Registration', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  mecBookingId: {
+    type: DataTypes.STRING,
+    unique: true,
+    comment: 'Booking ID from MEC WordPress plugin'
+  },
+  eventId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'events',
+      key: 'id'
+    }
+  },
+  attendeeName: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  attendeeEmail: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      isEmail: true
+    }
+  },
+  attendeePhone: {
+    type: DataTypes.STRING
+  },
+  numberOfTickets: {
+    type: DataTypes.INTEGER,
+    defaultValue: 1
+  },
+  registrationDate: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  qrCode: {
+    type: DataTypes.TEXT,
+    comment: 'QR code data URL or path'
+  },
+  checkedIn: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  checkedInAt: {
+    type: DataTypes.DATE
+  },
+  checkedInBy: {
+    type: DataTypes.INTEGER,
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  reminderSent: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  reminderSentAt: {
+    type: DataTypes.DATE
+  },
+  followUpSent: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  followUpSentAt: {
+    type: DataTypes.DATE
+  },
+  metadata: {
+    type: DataTypes.JSONB,
+    defaultValue: {},
+    comment: 'Additional data from MEC booking'
+  }
+}, {
+  tableName: 'registrations',
+  timestamps: true,
+  indexes: [
+    { fields: ['eventId'] },
+    { fields: ['attendeeEmail'] },
+    { fields: ['checkedIn'] },
+    { fields: ['registrationDate'] }
+  ]
+});
+
+export default Registration;
+

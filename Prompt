@@ -1,0 +1,138 @@
+Build a full-stack web application called “MEC Dashboard & Check-In App”.
+It integrates with the Modern Events Calendar (MEC) WordPress plugin through its REST API.
+The goal is to give event organizers a modern dashboard for registrations, analytics, and check-ins.
+
+🧱 Tech Stack
+
+Backend:
+
+Node.js + Express + PostgreSQL
+
+Sequelize ORM for data models
+
+JWT authentication for Admin and Staff users
+
+Helmet, CORS, and rate limiting for security
+
+Nodemailer for email notifications and reminders
+
+node-cron for automated reminders and scheduled syncs
+
+qrcode for generating QR codes
+
+pdfkit or pdfmake for dynamic PDF export
+
+axios or node-fetch to connect to the MEC REST API
+
+Frontend:
+
+React 18 + Vite + Tailwind CSS + React Router + Axios
+
+Recharts for charts and analytics
+
+html5-qrcode or react-qr-scanner for QR scanning
+
+Context API or Zustand for global state management
+
+Responsive layout styled for desktop and tablet
+
+Deployment:
+
+Docker Compose (backend + PostgreSQL)
+
+DigitalOcean App Platform or droplet deployment
+
+⚙️ Core Features
+1. MEC Integration
+
+Use environment variable MEC_API_URL: https://housesoflight.org/wp-json/mec/v1.0
+
+Endpoints to fetch:
+
+/events → list of events
+
+/bookings → attendee and registration data
+
+Sync data every few hours using cron or manual “Sync Now” button
+
+Store results in local PostgreSQL tables for faster access
+
+2. Authentication
+
+Secure login for Admin and Staff roles using JWT
+
+Admin: full access to events, analytics, exports
+
+Staff: check-in and attendee view only
+
+3. Dashboard Overview
+
+Global dashboard showing:
+
+Total events
+
+Total registrations
+
+Upcoming events
+
+Quick links to view or export data
+
+4. Event Detail View (Main Page)
+
+Each event detail page includes:
+
+Event header with title, date, and location
+
+Action buttons: Export PDF, Export CSV, Send Reminder, Sync Now
+
+KPI cards showing:
+
+Total Registered
+
+Checked-In
+
+Remaining Seats
+
+Capacity %
+
+Line chart (daily registration trends using Recharts)
+
+Pie chart (Registered vs Checked-In vs Remaining)
+
+Attendee table with filters and search
+
+Modal for PDF field selection and export
+
+5. QR Check-In System
+
+Generate unique QR for each registration (encode booking_id or attendee_id)
+
+Staff can scan QR via webcam using html5-qrcode
+
+Backend endpoint /checkin/:id marks attendee as checked-in
+
+Prevent duplicate check-ins and update local database
+
+Optional: sync check-in status back to MEC via POST/PATCH if supported
+
+6. Custom PDF Export Builder
+
+Endpoint /events/:id/export
+
+Accepts query parameter fields=name,email,checkin_status,registration_date
+
+Generates a branded PDF (church logo, header, timestamp footer)
+
+Frontend modal allows selecting which fields to include
+
+Automatically downloads PDF after generation
+
+7. Email Notifications
+
+Nodemailer used to send:
+
+Registration confirmation (optional if not sent by MEC)
+
+24-hour reminder before event
+
+“Thank you for attending” follow-up
