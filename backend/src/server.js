@@ -47,9 +47,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 // API routes
-console.log('🔄 Mounting API routes...');
 app.use('/api', routes);
-console.log('✅ API routes mounted');
 
 // Root endpoint
 app.get('/', (req, res) => {
