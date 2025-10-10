@@ -6,18 +6,16 @@ class MECService {
     this.baseURL = process.env.MEC_API_URL;
     this.apiKey = process.env.MEC_API_KEY;
     this.axiosInstance = axios.create({
-      baseURL: this.baseURL,
+      baseURL: `${this.baseURL}/wp-json/mec/v1.0`,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
       }
     });
 
-    // Add API key to headers if provided
+    // Add MEC API token header if provided
     if (this.apiKey) {
-      this.axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${this.apiKey}`;
-      // Also try X-API-Key header as fallback
-      this.axiosInstance.defaults.headers.common['X-API-Key'] = this.apiKey;
+      this.axiosInstance.defaults.headers.common['mec-token'] = this.apiKey;
     }
 
     // Add basic auth if credentials provided
@@ -27,17 +25,6 @@ class MECService {
         password: process.env.MEC_API_AUTH_PASS
       };
     }
-
-    // Add request interceptor to append api_key as query parameter
-    this.axiosInstance.interceptors.request.use((config) => {
-      if (this.apiKey) {
-        config.params = {
-          ...config.params,
-          api_key: this.apiKey
-        };
-      }
-      return config;
-    });
   }
 
   async testConnection() {
@@ -54,9 +41,30 @@ class MECService {
   async fetchEvents() {
     try {
       const response = await this.axiosInstance.get('/events');
-      return response.data;
+      console.log('📥 MEC API response:', JSON.stringify(response.data, null, 2));
+      
+      // MEC API returns events grouped by date, we need to flatten them
+      const eventsData = response.data;
+      if (eventsData && eventsData.events) {
+        const allEvents = [];
+        Object.keys(eventsData.events).forEach(date => {
+          const eventsForDate = eventsData.events[date];
+          if (Array.isArray(eventsForDate)) {
+            eventsForDate.forEach(event => {
+              allEvents.push({
+                ...event,
+                date: date // Add the date for reference
+              });
+            });
+          }
+        });
+        return allEvents;
+      }
+      
+      return [];
     } catch (error) {
       console.error('Error fetching events from MEC:', error.message);
+      console.error('Error details:', error.response?.data);
       throw new Error('Failed to fetch events from MEC API');
     }
   }
@@ -89,29 +97,34 @@ class MECService {
 
       for (const mecEvent of mecEvents) {
         try {
-          const eventData = {
-            mecEventId: String(mecEvent.id),
+          // Extract event data from MEC API format
+          const eventId = mecEvent.ID || mecEvent.id;
+          const eventData = mecEvent.data || mecEvent;
+          
+          const eventRecord = {
+            mecEventId: String(eventId),
             sourceUrl: site_url,
-            title: mecEvent.title || mecEvent.name || 'Untitled Event',
-            description: mecEvent.description || mecEvent.content || '',
-            startDate: new Date(mecEvent.start || mecEvent.start_date),
-            endDate: mecEvent.end || mecEvent.end_date ? new Date(mecEvent.end || mecEvent.end_date) : null,
-            location: mecEvent.location?.name || mecEvent.venue || '',
-            address: mecEvent.location?.address || '',
-            capacity: parseInt(mecEvent.capacity || mecEvent.spots || 0),
-            imageUrl: mecEvent.image || mecEvent.featured_image || '',
-            status: this.determineEventStatus(mecEvent),
+            title: eventData.title || eventData.post_title || 'Untitled Event',
+            description: eventData.content || eventData.post_content || '',
+            startDate: eventData.start_date ? new Date(`${eventData.start_date}T${eventData.start_time || '00:00:00'}`) : null,
+            endDate: eventData.end_date ? new Date(`${eventData.end_date}T${eventData.end_time || '23:59:59'}`) : null,
+            location: eventData.location || eventData.venue || '',
+            address: eventData.address || '',
+            capacity: parseInt(eventData.total_capacity || eventData.capacity || 0),
+            imageUrl: eventData.featured_image_url || eventData.image || '',
+            status: this.determineEventStatus(eventData),
             metadata: mecEvent,
             lastSyncedAt: new Date()
           };
 
-          await Event.upsert(eventData, {
+          await Event.upsert(eventRecord, {
             conflictFields: ['sourceUrl', 'mecEventId']
           });
 
+          console.log(`✅ Synced event: ${eventRecord.title} (ID: ${eventId})`);
           synced++;
         } catch (error) {
-          console.error(`Error syncing event ${mecEvent.id}:`, error.message);
+          console.error(`Error syncing event ${mecEvent.ID || mecEvent.id}:`, error.message);
           errors++;
         }
       }
