@@ -6,7 +6,7 @@ class MECService {
     this.baseURL = process.env.MEC_API_URL;
     this.apiKey = process.env.MEC_API_KEY;
     this.axiosInstance = axios.create({
-      baseURL: `${this.baseURL}/wp-json/mec/v1.0`,
+      baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/mec/v1.0`,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
