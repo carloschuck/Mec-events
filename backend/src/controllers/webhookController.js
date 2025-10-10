@@ -3,6 +3,15 @@ import crypto from 'crypto';
 
 export const handleMecWebhook = async (req, res) => {
   try {
+    // Set CORS headers for webhook requests
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, X-MEC-Signature, X-API-Key');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
     // Verify webhook signature if secret is configured
     const webhookSecret = process.env.WEBHOOK_SECRET;
     if (webhookSecret) {
