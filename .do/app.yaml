@@ -49,18 +49,20 @@ services:
         value: "0 */3 * * *"
       - key: REMINDER_CRON_SCHEDULE
         value: "0 9 * * *"
-      # Database connection (will be auto-populated by DigitalOcean)
+      # Database connection (external managed database)
       - key: DB_HOST
-        value: ${mec-postgres-db.HOSTNAME}
+        value: mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com
       - key: DB_PORT
-        value: ${mec-postgres-db.PORT}
+        value: "25060"
       - key: DB_NAME
-        value: ${mec-postgres-db.DATABASE}
+        value: defaultdb
       - key: DB_USER
-        value: ${mec-postgres-db.USERNAME}
+        value: doadmin
       - key: DB_PASSWORD
-        value: ${mec-postgres-db.PASSWORD}
+        value: YOUR_DATABASE_PASSWORD_HERE
         type: SECRET
+      - key: DB_SKIP_SYNC
+        value: "true"
 
   - name: frontend
     github:
@@ -80,14 +82,8 @@ services:
     envs:
       - key: VITE_API_URL
         value: ${APP_URL}/api
+        scope: RUN_AND_BUILD_TIME
 
-databases:
-  - name: mec-postgres-db
-    engine: PG
-    version: "15"
-    production: false
-    # Note: Using dev database for initial deployment
-    # To use a managed database cluster instead:
-    # 1. Create a cluster at https://cloud.digitalocean.com/databases
-    # 2. Remove this database section
-    # 3. Update environment variables to point to your cluster
+# Using external managed database
+# Database: mec-events-db (PostgreSQL 15, SFO3)
+# Host: mec-events-db-do-user-24283710-0.m.db.ondigitalocean.com
