@@ -169,12 +169,17 @@ export const syncEvents = async (req, res) => {
       });
     }
 
-    const result = await mecService.syncAll();
+    // Only sync events for now (bookings endpoint doesn't exist in MEC API)
+    const result = await mecService.syncEvents();
 
     res.json({
       success: true,
-      message: 'Sync completed successfully',
-      data: result
+      message: 'Events sync completed successfully',
+      data: {
+        events: result,
+        bookings: { synced: 0, errors: 0 },
+        method: 'api'
+      }
     });
   } catch (error) {
     res.status(500).json({
