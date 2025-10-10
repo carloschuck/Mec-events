@@ -31,6 +31,31 @@ router.get('/auth/test', (req, res) => {
   });
 });
 
+// Database setup endpoint
+router.post('/setup-db', async (req, res) => {
+  try {
+    console.log('🗄️ Database setup endpoint called');
+    
+    // Import the setup script
+    const { setupDatabase } = await import('../scripts/setup-database.js');
+    
+    // Run the setup
+    await setupDatabase();
+    
+    res.json({
+      success: true,
+      message: 'Database setup completed successfully'
+    });
+  } catch (error) {
+    console.error('❌ Database setup failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Database setup failed',
+      error: error.message
+    });
+  }
+});
+
 // Debug: List all registered routes
 console.log('🔍 Registered routes:');
 router.stack.forEach((layer) => {
