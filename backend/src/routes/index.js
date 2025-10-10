@@ -20,17 +20,6 @@ router.get('/auth/test', (req, res) => {
   });
 });
 
-// Also add a catch-all route to see what's being requested
-router.all('*', (req, res) => {
-  console.log('🔍 Unhandled route:', req.method, req.path);
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    method: req.method,
-    path: req.path
-  });
-});
-
 console.log('✅ Simple auth routes created');
 
 // Health check endpoint
@@ -107,6 +96,17 @@ router.get('/setup-db', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Catch-all route for debugging (must be last)
+router.all('*', (req, res) => {
+  console.log('🔍 Unhandled route:', req.method, req.path);
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    method: req.method,
+    path: req.path
+  });
 });
 
 export default router;
