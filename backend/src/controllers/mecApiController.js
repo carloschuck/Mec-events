@@ -682,45 +682,30 @@ export const syncBookings = async (req, res) => {
     // Sync each booking to our database
     for (const booking of bookings) {
       try {
-        // Find the corresponding event in our database
-        const event = await Event.findOne({
+        // Find the corresponding event in our database (try with and without sourceUrl match)
+        let event = await Event.findOne({
           where: {
             mecEventId: String(booking.event_id),
             sourceUrl
           }
         });
         
+        // Try without sourceUrl if not found (just match by mecEventId)
         if (!event) {
-          console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id}, sourceUrl: ${sourceUrl})`);
-          // Try without trailing slash if not found
-          if (sourceUrl.endsWith('/')) {
-            const altEvent = await Event.findOne({
-              where: {
-                mecEventId: String(booking.event_id),
-                sourceUrl: sourceUrl.slice(0, -1)
-              }
-            });
-            if (altEvent) {
-              console.log(`✅ Found event with alternate sourceUrl (no trailing slash)`);
-              // Use this event
-              const registrationData = {
-                mecBookingId: String(booking.id),
-                sourceUrl,
-                eventId: altEvent.id,
-                attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
-                attendeeEmail: booking.email || '',
-                attendeePhone: booking.phone || '',
-                numberOfTickets: parseInt(booking.tickets || booking.count || 1),
-                registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
-                metadata: booking
-              };
-              await Registration.upsert(registrationData, {
-                conflictFields: ['sourceUrl', 'mecBookingId']
-              });
-              syncedCount++;
-              console.log(`✅ Synced booking ${booking.id} for event: ${altEvent.title}`);
-              continue;
+          event = await Event.findOne({
+            where: {
+              mecEventId: String(booking.event_id)
             }
+          });
+          if (event) {
+            console.log(`✅ Found event ${booking.event_id} by mecEventId only (sourceUrl mismatch)`);
+          }
+        }
+        
+        if (!event) {
+          // Only log first 5 errors to avoid spam
+          if (errorCount < 5) {
+            console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id}, sourceUrl: ${sourceUrl})`);
           }
           errorCount++;
           continue;
