@@ -327,7 +327,9 @@ export const syncEvents = async (req, res) => {
     console.log('🔄 Starting WordPress REST API events sync...');
     
     // Fetch events from WordPress REST API
-    const response = await fetch(`${mecApiUrl}/wp-json/wp/v2/mec-events?per_page=100`, {
+    // Order by modified date (descending) to get most recently updated events first
+    // This helps get current/upcoming events that have been recently created or updated
+    const response = await fetch(`${mecApiUrl}/wp-json/wp/v2/mec-events?per_page=100&orderby=modified&order=desc&status=publish`, {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'MEC-Events-App/1.0'
@@ -359,14 +361,56 @@ export const syncEvents = async (req, res) => {
           description = JSON.stringify(event.content);
         }
 
-        // Map WordPress status to our enum values
+        // Extract MEC event dates from metadata
+        let startDate = null;
+        let endDate = null;
+        
+        // Try to get dates from mec_start_datetime and mec_end_datetime first
+        if (event.meta?.mec_start_datetime) {
+          startDate = new Date(event.meta.mec_start_datetime);
+        } else if (event.meta?.mec_start_date) {
+          // Fallback to mec_start_date
+          const startDateStr = event.meta.mec_start_date;
+          const startTime = event.meta?.mec_start_time_hour 
+            ? `${event.meta.mec_start_time_hour}:${event.meta.mec_start_time_minutes || '00'} ${event.meta.mec_start_time_ampm || 'AM'}`
+            : '00:00';
+          startDate = new Date(`${startDateStr} ${startTime}`);
+        }
+        
+        if (event.meta?.mec_end_datetime) {
+          endDate = new Date(event.meta.mec_end_datetime);
+        } else if (event.meta?.mec_end_date) {
+          const endDateStr = event.meta.mec_end_date;
+          const endTime = event.meta?.mec_end_time_hour 
+            ? `${event.meta.mec_end_time_hour}:${event.meta.mec_end_time_minutes || '00'} ${event.meta.mec_end_time_ampm || 'PM'}`
+            : '23:59';
+          endDate = new Date(`${endDateStr} ${endTime}`);
+        }
+
+        // Skip past events - only sync upcoming or ongoing events
+        const now = new Date();
+        if (endDate && endDate < now) {
+          console.log(`⏭️  Skipping past event: ${event.title?.rendered || event.title} (ended ${endDate.toLocaleDateString()})`);
+          continue;
+        }
+
+        // If we don't have a valid start date, skip this event
+        if (!startDate || isNaN(startDate.getTime())) {
+          console.log(`⚠️  Skipping event with invalid date: ${event.title?.rendered || event.title}`);
+          errorCount++;
+          continue;
+        }
+
+        // Determine event status based on dates
         let status = 'upcoming';
-        if (event.status === 'publish') {
+        if (event.status === 'draft' || event.status === 'private') {
+          status = 'cancelled';
+        } else if (endDate && now > endDate) {
+          status = 'completed';
+        } else if (startDate && now >= startDate && (!endDate || now <= endDate)) {
+          status = 'ongoing';
+        } else {
           status = 'upcoming';
-        } else if (event.status === 'draft') {
-          status = 'cancelled';
-        } else if (event.status === 'private') {
-          status = 'cancelled';
         }
 
         const eventRecord = {
@@ -374,11 +418,11 @@ export const syncEvents = async (req, res) => {
           sourceUrl: mecApiUrl,
           title: event.title?.rendered || event.title || 'Untitled Event',
           description: description,
-          startDate: event.date ? new Date(event.date) : new Date(),
-          endDate: event.modified ? new Date(event.modified) : null,
+          startDate: startDate,
+          endDate: endDate,
           location: event.meta?.mec_location_id ? `Location ID: ${event.meta.mec_location_id}` : '',
-          address: '',
-          capacity: parseInt(event.meta?.mec_booking?.bookings_limit || 0),
+          address: event.meta?.mec_address || '',
+          capacity: parseInt(event.meta?.mec_booking?.bookings_limit || event.meta?.mec_bookings_limit || 0),
           imageUrl: event.featured_media || '',
           status: status,
           metadata: event,
@@ -390,7 +434,7 @@ export const syncEvents = async (req, res) => {
         });
         
         syncedCount++;
-        console.log(`✅ Synced event: ${event.title} (ID: ${event.id})`);
+        console.log(`✅ Synced event: ${eventRecord.title} (${status}, starts ${startDate.toLocaleDateString()})`);
         
       } catch (error) {
         errorCount++;

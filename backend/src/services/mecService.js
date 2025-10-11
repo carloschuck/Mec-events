@@ -48,7 +48,9 @@ class MECService {
 
   async fetchEvents() {
     try {
-      const response = await this.axiosInstance.get('/mec-events?per_page=100');
+      // Order by modified date (descending) to get most recently updated events
+      // Only fetch published events
+      const response = await this.axiosInstance.get('/mec-events?per_page=100&orderby=modified&order=desc&status=publish');
       console.log('📥 WordPress REST API response:', JSON.stringify(response.data, null, 2));
       
       // WordPress REST API returns events as an array
@@ -121,11 +123,50 @@ class MECService {
           // Extract event data from MEC API format
           const eventId = mecEvent.ID || mecEvent.id;
           const eventData = mecEvent.data || mecEvent;
-          const eventDate = mecEvent.date; // This is the date key from the events object
           
-          // Parse dates from timestamps
-          const startDate = eventData.time?.start_timestamp ? new Date(eventData.time.start_timestamp * 1000) : null;
-          const endDate = eventData.time?.end_timestamp ? new Date(eventData.time.end_timestamp * 1000) : null;
+          // Extract dates from MEC metadata
+          let startDate = null;
+          let endDate = null;
+          
+          // Try to get dates from mec_start_datetime and mec_end_datetime first
+          if (eventData.meta?.mec_start_datetime) {
+            startDate = new Date(eventData.meta.mec_start_datetime);
+          } else if (eventData.meta?.mec_start_date) {
+            const startDateStr = eventData.meta.mec_start_date;
+            const startTime = eventData.meta?.mec_start_time_hour 
+              ? `${eventData.meta.mec_start_time_hour}:${eventData.meta.mec_start_time_minutes || '00'} ${eventData.meta.mec_start_time_ampm || 'AM'}`
+              : '00:00';
+            startDate = new Date(`${startDateStr} ${startTime}`);
+          } else if (eventData.time?.start_timestamp) {
+            // Fallback to timestamp if available
+            startDate = new Date(eventData.time.start_timestamp * 1000);
+          }
+          
+          if (eventData.meta?.mec_end_datetime) {
+            endDate = new Date(eventData.meta.mec_end_datetime);
+          } else if (eventData.meta?.mec_end_date) {
+            const endDateStr = eventData.meta.mec_end_date;
+            const endTime = eventData.meta?.mec_end_time_hour 
+              ? `${eventData.meta.mec_end_time_hour}:${eventData.meta.mec_end_time_minutes || '00'} ${eventData.meta.mec_end_time_ampm || 'PM'}`
+              : '23:59';
+            endDate = new Date(`${endDateStr} ${endTime}`);
+          } else if (eventData.time?.end_timestamp) {
+            endDate = new Date(eventData.time.end_timestamp * 1000);
+          }
+          
+          // Skip past events
+          const now = new Date();
+          if (endDate && endDate < now) {
+            console.log(`⏭️  Skipping past event: ${eventData.title || eventData.post?.post_title} (ended ${endDate.toLocaleDateString()})`);
+            continue;
+          }
+
+          // If we don't have a valid start date, skip this event
+          if (!startDate || isNaN(startDate.getTime())) {
+            console.log(`⚠️  Skipping event with invalid date: ${eventData.title || eventData.post?.post_title}`);
+            errors++;
+            continue;
+          }
           
           const eventRecord = {
             mecEventId: String(eventId),
@@ -135,8 +176,8 @@ class MECService {
             startDate: startDate,
             endDate: endDate,
             location: eventData.meta?.mec_location_id ? `Location ID: ${eventData.meta.mec_location_id}` : '',
-            address: '',
-            capacity: parseInt(eventData.mec?.total_capacity || eventData.mec?.capacity || 0),
+            address: eventData.meta?.mec_address || '',
+            capacity: parseInt(eventData.meta?.mec_bookings_limit || eventData.mec?.total_capacity || eventData.mec?.capacity || 0),
             imageUrl: eventData.featured_image || eventData.thumbnails?.full || '',
             status: this.determineEventStatus(eventData, startDate, endDate),
             metadata: mecEvent,
@@ -147,7 +188,7 @@ class MECService {
             conflictFields: ['sourceUrl', 'mecEventId']
           });
 
-          console.log(`✅ Synced event: ${eventRecord.title} (ID: ${eventId})`);
+          console.log(`✅ Synced event: ${eventRecord.title} (${eventRecord.status}, starts ${startDate.toLocaleDateString()})`);
           synced++;
         } catch (error) {
           console.error(`Error syncing event ${mecEvent.ID || mecEvent.id}:`, error.message);
