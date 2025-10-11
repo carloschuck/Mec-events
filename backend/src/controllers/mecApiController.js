@@ -327,35 +327,56 @@ export const syncEvents = async (req, res) => {
     
     console.log('🔄 Starting MEC Bridge API events sync...');
     
-    // Fetch ALL events (no date filter) to ensure we have all events that bookings reference
-    console.log(`📅 Fetching all events (no date filter)`);
+    // Fetch ALL events with pagination (no date filter) to ensure we have all events that bookings reference
+    console.log(`📅 Fetching all events with pagination (no date filter)`);
     
-    // Fetch events from custom MEC Bridge API endpoint
-    const params = new URLSearchParams({
-      per_page: '100'
-    });
+    let allEvents = [];
+    let page = 1;
+    let hasMore = true;
     
-    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/events?${params}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'MEC-Events-App/1.0'
+    while (hasMore) {
+      const params = new URLSearchParams({
+        per_page: '100',
+        page: String(page)
+      });
+      
+      const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/events?${params}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'MEC-Events-App/1.0'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
       }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
+      
+      const events = await response.json();
+      
+      if (!Array.isArray(events)) {
+        console.log('⚠️  API response is not an array:', typeof events);
+        throw new Error('Invalid API response format');
+      }
+      
+      console.log(`📥 Fetched page ${page}: ${events.length} events`);
+      
+      if (events.length === 0) {
+        hasMore = false;
+      } else {
+        allEvents = allEvents.concat(events);
+        page++;
+        // Safety limit - stop after 10 pages (1000 events)
+        if (page > 10) {
+          console.log(`⚠️  Reached page limit (10 pages)`);
+          hasMore = false;
+        }
+      }
     }
     
-    const events = await response.json();
-    
-    if (!Array.isArray(events)) {
-      console.log('⚠️  API response is not an array:', typeof events);
-      throw new Error('Invalid API response format');
-    }
-    
-    console.log(`📥 Fetched ${events.length} events from MEC Bridge API`);
+    const events = allEvents;
+    console.log(`📥 Total fetched: ${events.length} events from ${page - 1} pages`);
     
     let syncedCount = 0;
     let errorCount = 0;
