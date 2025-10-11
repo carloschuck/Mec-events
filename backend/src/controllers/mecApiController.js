@@ -327,20 +327,12 @@ export const syncEvents = async (req, res) => {
     
     console.log('🔄 Starting MEC Bridge API events sync...');
     
-    // Calculate date range: past 12 months to future 12 months (to match bookings with events)
-    const today = new Date();
-    const twelveMonthsAgo = new Date(today);
-    twelveMonthsAgo.setMonth(today.getMonth() - 12);
-    const startDate = twelveMonthsAgo.toISOString().split('T')[0]; // YYYY-MM-DD
-    const endDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()).toISOString().split('T')[0];
+    // Fetch ALL events (no date filter) to ensure we have all events that bookings reference
+    console.log(`📅 Fetching all events (no date filter)`);
     
-    console.log(`📅 Fetching events from ${startDate} to ${endDate}`);
-    
-    // Fetch events from custom MEC Bridge API endpoint with date filters
+    // Fetch events from custom MEC Bridge API endpoint
     const params = new URLSearchParams({
-      per_page: '100',
-      start_date: startDate,
-      end_date: endDate
+      per_page: '100'
     });
     
     const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/events?${params}`, {
