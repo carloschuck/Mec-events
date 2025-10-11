@@ -10,7 +10,10 @@ import {
   CheckCircle, 
   Search,
   RefreshCw,
-  Filter
+  Filter,
+  SortAsc,
+  SortDesc,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -19,18 +22,45 @@ const Events = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('upcoming'); // Default to upcoming
+  const [dateFilter, setDateFilter] = useState('');
+  const [capacityFilter, setCapacityFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [sortBy, setSortBy] = useState('startDate');
+  const [sortOrder, setSortOrder] = useState('ASC');
+  const [filterOptions, setFilterOptions] = useState({ locations: [], dateStats: {} });
+  const [showFilters, setShowFilters] = useState(false);
   const { user } = useAuthStore();
 
   useEffect(() => {
     fetchEvents();
-  }, [search, statusFilter]);
+  }, [search, statusFilter, dateFilter, capacityFilter, locationFilter, sortBy, sortOrder]);
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
+
+  const fetchFilterOptions = async () => {
+    try {
+      const response = await api.get('/events/filters');
+      if (response.data.success) {
+        setFilterOptions(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load filter options:', error);
+    }
+  };
 
   const fetchEvents = async () => {
     try {
       const params = {};
       if (search) params.search = search;
       if (statusFilter) params.status = statusFilter;
+      if (dateFilter) params.dateFilter = dateFilter;
+      if (capacityFilter) params.capacityFilter = capacityFilter;
+      if (locationFilter) params.location = locationFilter;
+      if (sortBy) params.sortBy = sortBy;
+      if (sortOrder) params.sortOrder = sortOrder;
 
       const response = await api.get('/events', { params });
       if (response.data.success) {
@@ -75,6 +105,36 @@ const Events = () => {
     }
   };
 
+  const clearAllFilters = () => {
+    setSearch('');
+    setStatusFilter('upcoming');
+    setDateFilter('');
+    setCapacityFilter('');
+    setLocationFilter('');
+    setSortBy('startDate');
+    setSortOrder('ASC');
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (search) count++;
+    if (statusFilter && statusFilter !== 'upcoming') count++;
+    if (dateFilter) count++;
+    if (capacityFilter) count++;
+    if (locationFilter) count++;
+    if (sortBy !== 'startDate' || sortOrder !== 'ASC') count++;
+    return count;
+  };
+
+  const toggleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortBy(field);
+      setSortOrder('ASC');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -106,34 +166,146 @@ const Events = () => {
 
       {/* Filters */}
       <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search events..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
-            />
+        <div className="flex flex-col gap-4">
+          {/* Main Filter Row */}
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="flex flex-col md:flex-row gap-4 flex-1">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search events..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="input pl-10 w-full"
+                />
+              </div>
+
+              {/* Status Filter */}
+              <div className="relative">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="input pl-10 appearance-none min-w-[140px]"
+                >
+                  <option value="">All Status</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="ongoing">Ongoing</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Filter Controls */}
+            <div className="flex items-center gap-2">
+              {getActiveFiltersCount() > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                >
+                  <X className="w-4 h-4" />
+                  Clear all
+                </button>
+              )}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="btn btn-outline flex items-center gap-2"
+              >
+                <Filter className="w-4 h-4" />
+                Filters
+                {getActiveFiltersCount() > 0 && (
+                  <span className="bg-primary-600 text-white text-xs rounded-full px-2 py-0.5">
+                    {getActiveFiltersCount()}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* Status Filter */}
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="input pl-10 appearance-none"
-            >
-              <option value="">All Status</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="ongoing">Ongoing</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="border-t pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Date Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">All Dates</option>
+                    <option value="today">Today ({filterOptions.dateStats.today})</option>
+                    <option value="thisWeek">This Week ({filterOptions.dateStats.thisWeek})</option>
+                    <option value="thisMonth">This Month ({filterOptions.dateStats.thisMonth})</option>
+                    <option value="next30Days">Next 30 Days ({filterOptions.dateStats.next30Days})</option>
+                    <option value="upcoming">All Upcoming ({filterOptions.dateStats.upcoming})</option>
+                    <option value="past">Past Events ({filterOptions.dateStats.past})</option>
+                  </select>
+                </div>
+
+                {/* Capacity Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
+                  <select
+                    value={capacityFilter}
+                    onChange={(e) => setCapacityFilter(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">All Capacity</option>
+                    <option value="available">Available Seats</option>
+                    <option value="full">Full Events</option>
+                    <option value="lowCapacity">Low Capacity (80%+)</option>
+                    <option value="popular">Popular (10+ registrations)</option>
+                    <option value="new">New (≤2 registrations)</option>
+                  </select>
+                </div>
+
+                {/* Location Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <select
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    className="input w-full"
+                  >
+                    <option value="">All Locations</option>
+                    {filterOptions.locations.map((location) => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Sort Options */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                  <div className="flex gap-1">
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="input flex-1"
+                    >
+                      <option value="startDate">Date</option>
+                      <option value="title">Title</option>
+                      <option value="registrations">Registrations</option>
+                    </select>
+                    <button
+                      onClick={() => toggleSort(sortBy)}
+                      className="btn btn-outline px-3"
+                      title={`Sort ${sortOrder === 'ASC' ? 'Descending' : 'Ascending'}`}
+                    >
+                      {sortOrder === 'ASC' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

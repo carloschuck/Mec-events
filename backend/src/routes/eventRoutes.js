@@ -6,6 +6,7 @@ import {
   exportEventPDF,
   exportEventCSV,
   getEventAnalytics,
+  getEventFilters,
   testMecConnection
 } from '../controllers/eventController.js';
 import { protect, authorize } from '../middleware/auth.js';
@@ -13,6 +14,7 @@ import { protect, authorize } from '../middleware/auth.js';
 const router = express.Router();
 
 router.get('/test-mec', protect, authorize('admin'), testMecConnection);
+router.get('/filters', protect, getEventFilters);
 router.get('/', protect, getEvents);
 router.get('/:id', protect, getEvent);
 router.get('/:id/analytics', protect, getEventAnalytics);

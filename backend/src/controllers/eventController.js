@@ -22,14 +22,26 @@ export const testMecConnection = async (req, res) => {
 
 export const getEvents = async (req, res) => {
   try {
-    const { status, search, page = 1, limit = 10 } = req.query;
+    const { 
+      status, 
+      search, 
+      page = 1, 
+      limit = 10, 
+      dateFilter,
+      capacityFilter,
+      sortBy = 'startDate',
+      sortOrder = 'ASC',
+      location
+    } = req.query;
 
     const where = {};
 
+    // Status filter
     if (status) {
       where.status = status;
     }
 
+    // Search filter
     if (search) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
@@ -37,7 +49,71 @@ export const getEvents = async (req, res) => {
       ];
     }
 
+    // Location filter
+    if (location) {
+      where.location = { [Op.iLike]: `%${location}%` };
+    }
+
+    // Date range filters
+    if (dateFilter) {
+      const now = new Date();
+      switch (dateFilter) {
+        case 'today':
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          where.startDate = {
+            [Op.gte]: today,
+            [Op.lt]: tomorrow
+          };
+          break;
+        case 'thisWeek':
+          const startOfWeek = new Date(now);
+          startOfWeek.setDate(now.getDate() - now.getDay());
+          startOfWeek.setHours(0, 0, 0, 0);
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setDate(startOfWeek.getDate() + 7);
+          where.startDate = {
+            [Op.gte]: startOfWeek,
+            [Op.lt]: endOfWeek
+          };
+          break;
+        case 'thisMonth':
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+          where.startDate = {
+            [Op.gte]: startOfMonth,
+            [Op.lt]: endOfMonth
+          };
+          break;
+        case 'next30Days':
+          const next30Days = new Date(now);
+          next30Days.setDate(now.getDate() + 30);
+          where.startDate = {
+            [Op.gte]: now,
+            [Op.lte]: next30Days
+          };
+          break;
+        case 'past':
+          where.startDate = { [Op.lt]: now };
+          break;
+        case 'upcoming':
+        default:
+          where.startDate = { [Op.gte]: now };
+          break;
+      }
+    }
+
     const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Build order clause
+    let order = [];
+    if (sortBy === 'registrations') {
+      // We'll handle this after getting the data
+      order = [['startDate', sortOrder]];
+    } else {
+      order = [[sortBy, sortOrder]];
+    }
 
     const { count, rows: events } = await Event.findAndCountAll({
       where,
@@ -48,13 +124,13 @@ export const getEvents = async (req, res) => {
           attributes: ['id', 'checkedIn']
         }
       ],
-      order: [['startDate', 'ASC']],
+      order,
       limit: parseInt(limit),
       offset
     });
 
     // Add computed fields
-    const eventsWithStats = events.map(event => {
+    let eventsWithStats = events.map(event => {
       const eventJson = event.toJSON();
       const totalRegistrations = eventJson.registrations.length;
       const checkedInCount = eventJson.registrations.filter(r => r.checkedIn).length;
@@ -73,6 +149,35 @@ export const getEvents = async (req, res) => {
         }
       };
     });
+
+    // Apply capacity filter after computing stats
+    if (capacityFilter) {
+      eventsWithStats = eventsWithStats.filter(event => {
+        switch (capacityFilter) {
+          case 'full':
+            return event.stats.remainingSeats === 0 && event.capacity > 0;
+          case 'available':
+            return event.stats.remainingSeats > 0;
+          case 'lowCapacity':
+            return event.stats.capacityPercentage >= 80 && event.stats.remainingSeats > 0;
+          case 'popular':
+            return event.stats.totalRegistrations >= 10;
+          case 'new':
+            return event.stats.totalRegistrations <= 2;
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Handle sorting by registrations
+    if (sortBy === 'registrations') {
+      eventsWithStats.sort((a, b) => {
+        const aReg = a.stats.totalRegistrations;
+        const bReg = b.stats.totalRegistrations;
+        return sortOrder === 'ASC' ? aReg - bReg : bReg - aReg;
+      });
+    }
 
     res.json({
       success: true,
@@ -261,6 +366,68 @@ export const exportEventCSV = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error exporting CSV',
+      error: error.message
+    });
+  }
+};
+
+export const getEventFilters = async (req, res) => {
+  try {
+    // Get unique locations
+    const locations = await Event.findAll({
+      attributes: ['location'],
+      where: {
+        location: { [Op.ne]: null }
+      },
+      group: ['location'],
+      order: [['location', 'ASC']]
+    });
+
+    // Get date range stats
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const next30Days = new Date(now);
+    next30Days.setDate(now.getDate() + 30);
+
+    const [todayCount, thisWeekCount, thisMonthCount, next30DaysCount, upcomingCount, pastCount] = await Promise.all([
+      Event.count({ where: { startDate: { [Op.gte]: today, [Op.lt]: tomorrow } } }),
+      Event.count({ where: { startDate: { [Op.gte]: startOfWeek, [Op.lt]: endOfWeek } } }),
+      Event.count({ where: { startDate: { [Op.gte]: startOfMonth, [Op.lt]: endOfMonth } } }),
+      Event.count({ where: { startDate: { [Op.gte]: now, [Op.lte]: next30Days } } }),
+      Event.count({ where: { startDate: { [Op.gte]: now } } }),
+      Event.count({ where: { startDate: { [Op.lt]: now } } })
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        locations: locations.map(l => l.location).filter(Boolean),
+        dateStats: {
+          today: todayCount,
+          thisWeek: thisWeekCount,
+          thisMonth: thisMonthCount,
+          next30Days: next30DaysCount,
+          upcoming: upcomingCount,
+          past: pastCount
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching filter options',
       error: error.message
     });
   }
