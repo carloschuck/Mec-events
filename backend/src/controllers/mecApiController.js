@@ -683,6 +683,72 @@ export const cleanupSourceUrlDuplicates = async (req, res) => {
 };
 
 /**
+ * Debug endpoint to test syncing just one booking
+ * POST /api/mec-api/debug/sync-one-booking
+ */
+export const debugSyncOneBooking = async (req, res) => {
+  try {
+    const { Event, Registration } = await import('../models/index.js');
+    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    mecApiUrl = mecApiUrl.replace(/\/$/, '');
+    const sourceUrl = mecApiUrl;
+    
+    // Fetch just 1 booking
+    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=1`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'MEC-Events-App/1.0'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    
+    const bookings = await response.json();
+    const booking = bookings[0];
+    
+    // Try to find the event
+    let event = await Event.findOne({
+      where: {
+        mecEventId: String(booking.event_id),
+        sourceUrl
+      }
+    });
+    
+    if (!event) {
+      event = await Event.findOne({
+        where: {
+          mecEventId: String(booking.event_id)
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      booking: {
+        id: booking.id,
+        event_id: booking.event_id,
+        name: booking.name,
+        email: booking.email
+      },
+      event: event ? {
+        id: event.id,
+        mecEventId: event.mecEventId,
+        title: event.title,
+        sourceUrl: event.sourceUrl
+      } : null,
+      sourceUrl
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
  * Debug endpoint to test booking match for event 37332
  * GET /api/mec-api/debug/test-booking-match
  */
