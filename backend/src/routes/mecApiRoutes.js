@@ -9,7 +9,8 @@ import {
   login,
   syncEvents,
   syncBookings,
-  cleanupOldEvents
+  cleanupOldEvents,
+  debugEventIds
 } from '../controllers/mecApiController.js';
 
 const router = express.Router();
@@ -43,5 +44,8 @@ router.post('/sync/bookings', syncBookings);
 
 // Clean up old events from the database
 router.delete('/cleanup/old-events', cleanupOldEvents);
+
+// Debug: Get event IDs in database
+router.get('/debug/event-ids', debugEventIds);
 
 export default router;

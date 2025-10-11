@@ -649,6 +649,32 @@ export const cleanupOldEvents = async (req, res) => {
 };
 
 /**
+ * Debug endpoint to check what event IDs we have in database
+ * GET /api/mec-api/debug/event-ids
+ */
+export const debugEventIds = async (req, res) => {
+  try {
+    const { Event } = await import('../models/index.js');
+    const events = await Event.findAll({
+      attributes: ['id', 'mecEventId', 'title', 'sourceUrl'],
+      limit: 20,
+      order: [['mecEventId', 'DESC']]
+    });
+    
+    res.json({
+      success: true,
+      total: await Event.count(),
+      sample: events
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
  * Sync bookings/registrations from MEC API
  * POST /api/mec-api/sync/bookings
  */
