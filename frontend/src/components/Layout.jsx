@@ -51,8 +51,8 @@ const Layout = () => {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col w-64 bg-white border-r border-gray-200">
         <div className="p-6 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-primary-600">MEC Dashboard</h1>
-          <p className="text-sm text-gray-600 mt-1">Event Management</p>
+          <h1 className="text-2xl font-bold text-primary-600">Houses Events</h1>
+          <p className="text-sm text-gray-600 mt-1">Events Dashboard</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -95,7 +95,7 @@ const Layout = () => {
       {/* Mobile Header */}
       <div className="md:hidden bg-white border-b border-gray-200">
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl font-bold text-primary-600">MEC Dashboard</h1>
+          <h1 className="text-xl font-bold text-primary-600">Houses Events</h1>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg hover:bg-gray-100"
