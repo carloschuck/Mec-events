@@ -91,8 +91,8 @@ class MEC_API_Bridge {
     }
     
     public function get_events_with_metadata($request) {
-        $per_page = $request->get_param('per_page') ?: 100;
-        $page = $request->get_param('page') ?: 1;
+        $per_page = $request->get_param('per_page') ? $request->get_param('per_page') : 100;
+        $page = $request->get_param('page') ? $request->get_param('page') : 1;
         $start_date = $request->get_param('start_date');
         $end_date = $request->get_param('end_date');
         
@@ -160,8 +160,8 @@ class MEC_API_Bridge {
     public function get_bookings_with_metadata($request) {
         global $wpdb;
         
-        $per_page = $request->get_param('per_page') ?: 100;
-        $page = $request->get_param('page') ?: 1;
+        $per_page = $request->get_param('per_page') ? $request->get_param('per_page') : 100;
+        $page = $request->get_param('page') ? $request->get_param('page') : 1;
         $event_id = $request->get_param('event_id');
         $offset = ($page - 1) * $per_page;
         
@@ -193,8 +193,8 @@ class MEC_API_Bridge {
         global $wpdb;
         
         $event_id = $request->get_param('id');
-        $per_page = $request->get_param('per_page') ?: 100;
-        $page = $request->get_param('page') ?: 1;
+        $per_page = $request->get_param('per_page') ? $request->get_param('per_page') : 100;
+        $page = $request->get_param('page') ? $request->get_param('page') : 1;
         $offset = ($page - 1) * $per_page;
         
         $table_name = $wpdb->prefix . 'mec_bookings';
@@ -222,21 +222,29 @@ class MEC_API_Bridge {
         // Extract primary attendee information
         $primary_attendee = isset($attendees_info[0]) ? $attendees_info[0] : array();
         
+        // Get name - try primary attendee first, then booking fields
+        $name = '';
+        if (!empty($primary_attendee['name'])) {
+            $name = $primary_attendee['name'];
+        } elseif (isset($booking->first_name) || isset($booking->last_name)) {
+            $name = trim((isset($booking->first_name) ? $booking->first_name : '') . ' ' . (isset($booking->last_name) ? $booking->last_name : ''));
+        }
+        
         return array(
-            'id' => $booking->id,
-            'event_id' => $booking->event_id,
-            'name' => $primary_attendee['name'] ?? ($booking->first_name . ' ' . $booking->last_name),
-            'first_name' => $booking->first_name ?? $primary_attendee['name'] ?? '',
-            'last_name' => $booking->last_name ?? '',
-            'email' => $booking->email ?? $primary_attendee['email'] ?? '',
-            'phone' => $primary_attendee['tel'] ?? '',
-            'tickets' => $booking->tickets ?? 1,
-            'count' => $booking->tickets ?? 1,
-            'status' => $booking->status ?? 'confirmed',
-            'transaction_id' => $booking->transaction_id ?? '',
-            'date' => $booking->date ?? '',
-            'created_at' => $booking->timestamp ?? '',
-            'price' => $booking->price ?? 0,
+            'id' => isset($booking->id) ? $booking->id : 0,
+            'event_id' => isset($booking->event_id) ? $booking->event_id : 0,
+            'name' => $name,
+            'first_name' => isset($booking->first_name) ? $booking->first_name : (isset($primary_attendee['name']) ? $primary_attendee['name'] : ''),
+            'last_name' => isset($booking->last_name) ? $booking->last_name : '',
+            'email' => isset($booking->email) ? $booking->email : (isset($primary_attendee['email']) ? $primary_attendee['email'] : ''),
+            'phone' => isset($primary_attendee['tel']) ? $primary_attendee['tel'] : '',
+            'tickets' => isset($booking->tickets) ? $booking->tickets : 1,
+            'count' => isset($booking->tickets) ? $booking->tickets : 1,
+            'status' => isset($booking->status) ? $booking->status : 'confirmed',
+            'transaction_id' => isset($booking->transaction_id) ? $booking->transaction_id : '',
+            'date' => isset($booking->date) ? $booking->date : '',
+            'created_at' => isset($booking->timestamp) ? $booking->timestamp : '',
+            'price' => isset($booking->price) ? $booking->price : 0,
             'attendees_info' => $attendees_info,
             'raw_booking' => $booking
         );
