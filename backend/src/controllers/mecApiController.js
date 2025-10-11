@@ -392,14 +392,8 @@ export const syncEvents = async (req, res) => {
           continue;
         }
 
-        // Skip past events - only sync upcoming or ongoing events
-        const now = new Date();
-        if (endDate && endDate < now) {
-          console.log(`⏭️  Skipping past event: ${event.title} (ended ${endDate.toLocaleDateString()})`);
-          continue;
-        }
-
         // Determine event status based on dates
+        const now = new Date();
         let status = 'upcoming';
         if (endDate && now > endDate) {
           status = 'completed';
