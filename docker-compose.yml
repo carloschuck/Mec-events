@@ -30,7 +30,7 @@ services:
     container_name: mec-backend
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "3001:5000"
     environment:
       NODE_ENV: production
       PORT: 5000
@@ -42,6 +42,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production}
       JWT_EXPIRES_IN: 7d
       MEC_API_URL: ${MEC_API_URL:-https://housesoflight.org/wp-json/mec/v1.0}
+      MEC_API_KEY: ${MEC_API_KEY:-test}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}

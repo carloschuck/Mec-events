@@ -314,22 +314,21 @@ export const login = async (req, res) => {
 
 export const syncEvents = async (req, res) => {
   try {
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
     const apiKey = process.env.MEC_API_KEY;
     
-    if (!mecApiUrl || !apiKey) {
+    if (!mecApiUrl) {
       return res.status(400).json({
         success: false,
-        message: 'MEC API not configured. Please set MEC_API_URL and MEC_API_KEY environment variables.'
+        message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
     
-    console.log('🔄 Starting MEC events sync...');
+    console.log('🔄 Starting WordPress REST API events sync...');
     
-    // Fetch events from MEC API
-    const response = await fetch(`${mecApiUrl}/wp-json/mec/v1.0/events?limit=100`, {
+    // Fetch events from WordPress REST API
+    const response = await fetch(`${mecApiUrl}/wp-json/wp/v2/mec-events?per_page=100`, {
       headers: {
-        'mec-token': apiKey,
         'Content-Type': 'application/json',
         'User-Agent': 'MEC-Events-App/1.0'
       }
@@ -340,9 +339,9 @@ export const syncEvents = async (req, res) => {
     }
     
     const data = await response.json();
-    const events = data.data?.events || [];
+    const events = Array.isArray(data) ? data : [];
     
-    console.log(`📥 Fetched ${events.length} events from MEC API`);
+    console.log(`📥 Fetched ${events.length} events from WordPress REST API`);
     
     let syncedCount = 0;
     let errorCount = 0;
@@ -350,18 +349,38 @@ export const syncEvents = async (req, res) => {
     // Sync each event to our database
     for (const event of events) {
       try {
+        // Process description - handle both string and object formats
+        let description = '';
+        if (typeof event.content === 'string') {
+          description = event.content;
+        } else if (event.content?.rendered) {
+          description = event.content.rendered;
+        } else if (typeof event.content === 'object' && event.content !== null) {
+          description = JSON.stringify(event.content);
+        }
+
+        // Map WordPress status to our enum values
+        let status = 'upcoming';
+        if (event.status === 'publish') {
+          status = 'upcoming';
+        } else if (event.status === 'draft') {
+          status = 'cancelled';
+        } else if (event.status === 'private') {
+          status = 'cancelled';
+        }
+
         const eventRecord = {
           mecEventId: String(event.id),
           sourceUrl: mecApiUrl,
-          title: event.title || 'Untitled Event',
-          description: event.content || '',
-          startDate: event.start ? new Date(event.start.date) : null,
-          endDate: event.end ? new Date(event.end.date) : null,
-          location: event.location?.name || '',
-          address: event.location?.address || '',
+          title: event.title?.rendered || event.title || 'Untitled Event',
+          description: description,
+          startDate: event.date ? new Date(event.date) : new Date(),
+          endDate: event.modified ? new Date(event.modified) : null,
+          location: event.meta?.mec_location_id ? `Location ID: ${event.meta.mec_location_id}` : '',
+          address: '',
           capacity: parseInt(event.meta?.mec_booking?.bookings_limit || 0),
-          imageUrl: event.thumbnail || '',
-          status: event.status || 'published',
+          imageUrl: event.featured_media || '',
+          status: status,
           metadata: event,
           lastSyncedAt: new Date()
         };
@@ -406,21 +425,20 @@ export const syncEvents = async (req, res) => {
  */
 export const testConnection = async (req, res) => {
   try {
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
     const apiKey = process.env.MEC_API_KEY;
     
-    if (!mecApiUrl || !apiKey) {
+    if (!mecApiUrl) {
       return res.status(400).json({
         success: false,
-        message: 'MEC API not configured. Please set MEC_API_URL and MEC_API_KEY environment variables.'
+        message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
     
-    console.log(`🔍 Testing MEC API connection to: ${mecApiUrl}`);
+    console.log(`🔍 Testing WordPress REST API connection to: ${mecApiUrl}`);
     
-    const response = await fetch(`${mecApiUrl}/wp-json/mec/v1.0/events?limit=1`, {
+    const response = await fetch(`${mecApiUrl}/wp-json/wp/v2/mec-events?per_page=1`, {
       headers: {
-        'mec-token': apiKey,
         'Content-Type': 'application/json',
         'User-Agent': 'MEC-Events-App/1.0'
       }

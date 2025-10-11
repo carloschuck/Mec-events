@@ -6,14 +6,14 @@ class MECService {
     this.baseURL = process.env.MEC_API_URL;
     this.apiKey = process.env.MEC_API_KEY;
     this.axiosInstance = axios.create({
-      baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/mec/v1.0`,
+      baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/wp/v2`,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json'
       }
     });
 
-    // Add MEC API token header if provided
+    // Add MEC API token header if provided (for MEC-specific endpoints)
     if (this.apiKey) {
       this.axiosInstance.defaults.headers.common['mec-token'] = this.apiKey;
     }
@@ -29,51 +29,58 @@ class MECService {
 
   async testConnection() {
     try {
-      const response = await this.axiosInstance.get('/events');
-      console.log('✅ MEC API connection successful');
+      const response = await this.axiosInstance.get('/mec-events?per_page=1');
+      console.log('✅ WordPress REST API connection successful');
       return { 
         success: true, 
         data: {
           apiUrl: this.baseURL,
-          namespace: 'mec/v1.0',
-          eventsCount: response.data?.events ? Object.keys(response.data.events).length : 0,
+          namespace: 'wp/v2',
+          eventsCount: Array.isArray(response.data) ? response.data.length : 0,
           hasApiKey: !!this.apiKey
         }
       };
     } catch (error) {
-      console.error('❌ MEC API connection failed:', error.message);
+      console.error('❌ WordPress REST API connection failed:', error.message);
       return { success: false, error: error.message, response: error.response?.data };
     }
   }
 
   async fetchEvents() {
     try {
-      const response = await this.axiosInstance.get('/events');
-      console.log('📥 MEC API response:', JSON.stringify(response.data, null, 2));
+      const response = await this.axiosInstance.get('/mec-events?per_page=100');
+      console.log('📥 WordPress REST API response:', JSON.stringify(response.data, null, 2));
       
-      // MEC API returns events grouped by date, we need to flatten them
+      // WordPress REST API returns events as an array
       const eventsData = response.data;
-      if (eventsData && eventsData.events) {
-        const allEvents = [];
-        Object.keys(eventsData.events).forEach(date => {
-          const eventsForDate = eventsData.events[date];
-          if (Array.isArray(eventsForDate)) {
-            eventsForDate.forEach(event => {
-              allEvents.push({
-                ...event,
-                date: date // Add the date for reference
-              });
-            });
+      if (Array.isArray(eventsData)) {
+        return eventsData.map(event => ({
+          ...event,
+          // Transform WordPress event format to match our expected format
+          ID: event.id,
+          data: {
+            title: event.title?.rendered || event.title,
+            content: event.content?.rendered || event.content,
+            post: {
+              post_title: event.title?.rendered || event.title,
+              post_content: event.content?.rendered || event.content,
+              post_date: event.date,
+              post_modified: event.modified
+            },
+            meta: event.meta || {},
+            mec: event.mec || {},
+            time: event.time || {},
+            featured_image: event.featured_media,
+            thumbnails: event.thumbnails || {}
           }
-        });
-        return allEvents;
+        }));
       }
       
       return [];
     } catch (error) {
-      console.error('Error fetching events from MEC:', error.message);
+      console.error('Error fetching events from WordPress REST API:', error.message);
       console.error('Error details:', error.response?.data);
-      throw new Error('Failed to fetch events from MEC API');
+      throw new Error('Failed to fetch events from WordPress REST API');
     }
   }
 
