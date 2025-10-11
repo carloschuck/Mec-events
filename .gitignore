@@ -90,4 +90,4 @@ Thumbs.db
 
 # Build outputs
 dist/
-build/
+build/.DS_Store
