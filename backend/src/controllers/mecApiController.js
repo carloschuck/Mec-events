@@ -652,6 +652,37 @@ export const cleanupOldEvents = async (req, res) => {
 };
 
 /**
+ * Clean up duplicate events with trailing slash in sourceUrl
+ * DELETE /api/mec-api/cleanup/sourceurl-duplicates
+ */
+export const cleanupSourceUrlDuplicates = async (req, res) => {
+  try {
+    const { Event } = await import('../models/index.js');
+    
+    // Delete all events with sourceUrl ending in '/'
+    const result = await Event.destroy({
+      where: {
+        sourceUrl: {
+          [Op.like]: '%/'
+        }
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: `Deleted ${result} events with trailing slash in sourceUrl`,
+      deletedCount: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error cleaning up duplicates',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Debug endpoint to check what event IDs we have in database
  * GET /api/mec-api/debug/event-ids
  */

@@ -10,6 +10,7 @@ import {
   syncEvents,
   syncBookings,
   cleanupOldEvents,
+  cleanupSourceUrlDuplicates,
   debugEventIds
 } from '../controllers/mecApiController.js';
 
@@ -44,6 +45,9 @@ router.post('/sync/bookings', syncBookings);
 
 // Clean up old events from the database
 router.delete('/cleanup/old-events', cleanupOldEvents);
+
+// Clean up duplicate events with sourceUrl trailing slash
+router.delete('/cleanup/sourceurl-duplicates', cleanupSourceUrlDuplicates);
 
 // Debug: Get event IDs in database
 router.get('/debug/event-ids', debugEventIds);
