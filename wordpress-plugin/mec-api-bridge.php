@@ -101,8 +101,9 @@ class MEC_API_Bridge {
             'post_status' => 'publish',
             'posts_per_page' => $per_page,
             'paged' => $page,
-            'orderby' => 'modified',
-            'order' => 'DESC'
+            'orderby' => 'ID',
+            'order' => 'DESC',
+            'nopaging' => false // Ensure pagination works
         );
         
         // Add date filtering using meta query if dates provided
