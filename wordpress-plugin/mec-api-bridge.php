@@ -27,7 +27,10 @@ class MEC_API_Bridge {
         $this->webhook_secret = get_option('mec_api_webhook_secret', '');
         $this->api_key = get_option('mec_api_key', '');
         
-        // Hook into MEC events if API key is configured
+        // Always register REST API routes (no API key required for read access)
+        add_action('rest_api_init', array($this, 'register_rest_routes'));
+        
+        // Hook into MEC events for webhooks if API key is configured
         if (!empty($this->api_key)) {
             $this->init_mec_hooks();
         }
@@ -59,9 +62,6 @@ class MEC_API_Bridge {
         // Booking hooks (if MEC booking system is active)
         add_action('mec_booking_completed', array($this, 'on_booking_completed'), 10, 1);
         add_action('mec_booking_canceled', array($this, 'on_booking_canceled'), 10, 1);
-        
-        // Register custom REST API endpoint for fetching events with MEC metadata
-        add_action('rest_api_init', array($this, 'register_rest_routes'));
     }
     
     public function register_rest_routes() {
