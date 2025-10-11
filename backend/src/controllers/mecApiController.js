@@ -315,7 +315,7 @@ export const login = async (req, res) => {
 
 export const syncEvents = async (req, res) => {
   try {
-    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl) {
@@ -324,6 +324,9 @@ export const syncEvents = async (req, res) => {
         message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
+    
+    // Normalize sourceUrl - remove trailing slash for consistency
+    mecApiUrl = mecApiUrl.replace(/\/$/, '');
     
     console.log('🔄 Starting MEC Bridge API events sync...');
     
@@ -680,7 +683,7 @@ export const debugEventIds = async (req, res) => {
  */
 export const syncBookings = async (req, res) => {
   try {
-    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
     
     if (!mecApiUrl) {
       return res.status(400).json({
@@ -688,6 +691,9 @@ export const syncBookings = async (req, res) => {
         message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
+    
+    // Normalize sourceUrl - remove trailing slash for consistency
+    mecApiUrl = mecApiUrl.replace(/\/$/, '');
     
     console.log('🔄 Starting MEC Bridge API bookings sync...');
     
