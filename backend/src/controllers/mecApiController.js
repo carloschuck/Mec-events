@@ -952,12 +952,22 @@ export const syncBookings = async (req, res) => {
         }
         
         // Parse booking data
+        const attendeeName = booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+        const attendeeEmail = booking.email || '';
+        
+        // Skip bookings with invalid email (required field with validation)
+        if (!attendeeEmail || !attendeeEmail.includes('@')) {
+          console.log(`⚠️  Skipping booking ${booking.id} - invalid email: "${attendeeEmail}"`);
+          errorCount++;
+          continue;
+        }
+        
         const registrationData = {
           mecBookingId: String(booking.id),
           sourceUrl,
           eventId: event.id,
-          attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
-          attendeeEmail: booking.email || '',
+          attendeeName: attendeeName || 'Unknown',
+          attendeeEmail: attendeeEmail,
           attendeePhone: booking.phone || '',
           numberOfTickets: parseInt(booking.tickets || booking.count || 1),
           registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
