@@ -878,8 +878,8 @@ export const syncBookings = async (req, res) => {
     
     console.log('🔄 Starting MEC Bridge API bookings sync...');
     
-    // Fetch bookings from custom MEC Bridge API endpoint
-    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=1000`, {
+    // Fetch bookings from custom MEC Bridge API endpoint (test with 10 first)
+    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=10`, {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'MEC-Events-App/1.0'

@@ -167,25 +167,29 @@ class MEC_API_Bridge {
         $offset = ($page - 1) * $per_page;
         
         // MEC stores bookings in a custom table
-        $table_name = $wpdb->prefix . 'mec_bookings';
+        $bookings_table = $wpdb->prefix . 'mec_bookings';
+        $attendees_table = $wpdb->prefix . 'mec_attendees';
         
-        // Check if table exists
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        // Check if bookings table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$bookings_table'") != $bookings_table) {
             // Return empty array instead of error - bookings addon may not be installed
             return new WP_REST_Response(array(), 200);
         }
         
+        // Check if attendees table exists
+        $has_attendees_table = ($wpdb->get_var("SHOW TABLES LIKE '$attendees_table'") == $attendees_table);
+        
         // Build query with proper escaping
         if ($event_id) {
             $query = $wpdb->prepare(
-                "SELECT * FROM $table_name WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d",
+                "SELECT * FROM $bookings_table WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d",
                 intval($event_id),
                 intval($per_page),
                 intval($offset)
             );
         } else {
             $query = $wpdb->prepare(
-                "SELECT * FROM $table_name ORDER BY id DESC LIMIT %d OFFSET %d",
+                "SELECT * FROM $bookings_table ORDER BY id DESC LIMIT %d OFFSET %d",
                 intval($per_page),
                 intval($offset)
             );
@@ -195,7 +199,47 @@ class MEC_API_Bridge {
         
         $formatted_bookings = array();
         foreach ($bookings as $booking) {
-            $formatted_bookings[] = $this->format_booking_data($booking);
+            // Get attendees for this booking if attendees table exists
+            $attendees = array();
+            if ($has_attendees_table) {
+                $attendees_query = $wpdb->prepare(
+                    "SELECT * FROM $attendees_table WHERE booking_id = %d",
+                    intval($booking->id)
+                );
+                $attendees = $wpdb->get_results($attendees_query);
+            }
+            
+            // If no attendees found and booking has user_id, get user info from WordPress users table
+            if (empty($attendees) && isset($booking->user_id) && !empty($booking->user_id)) {
+                $user_query = $wpdb->prepare(
+                    "SELECT ID, user_email, display_name FROM {$wpdb->users} WHERE ID = %d",
+                    intval($booking->user_id)
+                );
+                $user = $wpdb->get_row($user_query);
+                if ($user) {
+                    // Get first_name and last_name from user meta
+                    $first_name = get_user_meta($user->ID, 'first_name', true);
+                    $last_name = get_user_meta($user->ID, 'last_name', true);
+                    
+                    // Convert user to attendee format
+                    $attendees = array(array(
+                        'id' => $user->ID,
+                        'email' => $user->user_email,
+                        'name' => $user->display_name,
+                        'first_name' => $first_name,
+                        'last_name' => $last_name
+                    ));
+                }
+            }
+            
+            // Debug: Add user query info to debug output
+            $debug_user_query = array(
+                'user_id' => isset($booking->user_id) ? $booking->user_id : null,
+                'user_found' => !empty($attendees),
+                'attendees_count' => count($attendees)
+            );
+            
+            $formatted_bookings[] = $this->format_booking_data($booking, $attendees, $debug_user_query);
         }
         
         return new WP_REST_Response($formatted_bookings, 200);
@@ -227,25 +271,40 @@ class MEC_API_Bridge {
         
         $formatted_bookings = array();
         foreach ($bookings as $booking) {
-            $formatted_bookings[] = $this->format_booking_data($booking);
+            $formatted_bookings[] = $this->format_booking_data($booking, array(), array());
         }
         
         return new WP_REST_Response($formatted_bookings, 200);
     }
     
-    private function format_booking_data($booking) {
+    private function format_booking_data($booking, $attendees = array(), $debug_user_query = array()) {
         // Decode attendees info if it's JSON
         $attendees_info = isset($booking->attendees_info) ? json_decode($booking->attendees_info, true) : array();
         
-        // Extract primary attendee information
-        $primary_attendee = isset($attendees_info[0]) ? $attendees_info[0] : array();
+        // Extract primary attendee information from attendees table if available
+        $primary_attendee = array();
+        if (!empty($attendees)) {
+            // Use first attendee from attendees table
+            $primary_attendee = (array) $attendees[0];
+        } elseif (isset($attendees_info[0])) {
+            // Fallback to attendees_info JSON
+            $primary_attendee = $attendees_info[0];
+        }
         
         // Get name - try primary attendee first, then booking fields
         $name = '';
         if (!empty($primary_attendee['name'])) {
             $name = $primary_attendee['name'];
+        } elseif (isset($primary_attendee['first_name']) || isset($primary_attendee['last_name'])) {
+            $name = trim((isset($primary_attendee['first_name']) ? $primary_attendee['first_name'] : '') . ' ' . (isset($primary_attendee['last_name']) ? $primary_attendee['last_name'] : ''));
         } elseif (isset($booking->first_name) || isset($booking->last_name)) {
             $name = trim((isset($booking->first_name) ? $booking->first_name : '') . ' ' . (isset($booking->last_name) ? $booking->last_name : ''));
+        }
+        
+        // Debug: Show all available fields
+        $all_fields = array();
+        foreach ($booking as $key => $value) {
+            $all_fields[$key] = $value;
         }
         
         return array(
@@ -254,8 +313,8 @@ class MEC_API_Bridge {
             'name' => $name,
             'first_name' => isset($booking->first_name) ? $booking->first_name : (isset($primary_attendee['name']) ? $primary_attendee['name'] : ''),
             'last_name' => isset($booking->last_name) ? $booking->last_name : '',
-            'email' => isset($booking->email) ? $booking->email : (isset($primary_attendee['email']) ? $primary_attendee['email'] : ''),
-            'phone' => isset($primary_attendee['tel']) ? $primary_attendee['tel'] : '',
+            'email' => isset($primary_attendee['email']) ? $primary_attendee['email'] : (isset($booking->email) ? $booking->email : ''),
+            'phone' => isset($primary_attendee['tel']) ? $primary_attendee['tel'] : (isset($primary_attendee['phone']) ? $primary_attendee['phone'] : ''),
             'tickets' => isset($booking->tickets) ? $booking->tickets : 1,
             'count' => isset($booking->tickets) ? $booking->tickets : 1,
             'status' => isset($booking->status) ? $booking->status : 'confirmed',
@@ -264,7 +323,10 @@ class MEC_API_Bridge {
             'created_at' => isset($booking->timestamp) ? $booking->timestamp : '',
             'price' => isset($booking->price) ? $booking->price : 0,
             'attendees_info' => $attendees_info,
-            'raw_booking' => $booking
+            'raw_booking' => $booking,
+            'debug_all_fields' => $all_fields,
+            'debug_attendees' => $attendees,
+            'debug_user_query' => $debug_user_query
         );
     }
     
