@@ -76,6 +76,18 @@ class MEC_API_Bridge {
             'callback' => array($this, 'get_event_with_metadata'),
             'permission_callback' => '__return_true',
         ));
+        
+        register_rest_route('mec-bridge/v1', '/bookings', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_bookings_with_metadata'),
+            'permission_callback' => '__return_true',
+        ));
+        
+        register_rest_route('mec-bridge/v1', '/events/(?P<id>\d+)/bookings', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_event_bookings'),
+            'permission_callback' => '__return_true',
+        ));
     }
     
     public function get_events_with_metadata($request) {
@@ -143,6 +155,91 @@ class MEC_API_Bridge {
         
         $event_data = $this->format_event_data($post_id);
         return new WP_REST_Response($event_data, 200);
+    }
+    
+    public function get_bookings_with_metadata($request) {
+        global $wpdb;
+        
+        $per_page = $request->get_param('per_page') ?: 100;
+        $page = $request->get_param('page') ?: 1;
+        $event_id = $request->get_param('event_id');
+        $offset = ($page - 1) * $per_page;
+        
+        // MEC stores bookings in a custom table
+        $table_name = $wpdb->prefix . 'mec_bookings';
+        
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
+        }
+        
+        $where = "WHERE 1=1";
+        if ($event_id) {
+            $where .= $wpdb->prepare(" AND event_id = %d", $event_id);
+        }
+        
+        $query = "SELECT * FROM $table_name $where ORDER BY id DESC LIMIT %d OFFSET %d";
+        $bookings = $wpdb->get_results($wpdb->prepare($query, $per_page, $offset));
+        
+        $formatted_bookings = array();
+        foreach ($bookings as $booking) {
+            $formatted_bookings[] = $this->format_booking_data($booking);
+        }
+        
+        return new WP_REST_Response($formatted_bookings, 200);
+    }
+    
+    public function get_event_bookings($request) {
+        global $wpdb;
+        
+        $event_id = $request->get_param('id');
+        $per_page = $request->get_param('per_page') ?: 100;
+        $page = $request->get_param('page') ?: 1;
+        $offset = ($page - 1) * $per_page;
+        
+        $table_name = $wpdb->prefix . 'mec_bookings';
+        
+        // Check if table exists
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
+        }
+        
+        $query = "SELECT * FROM $table_name WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d";
+        $bookings = $wpdb->get_results($wpdb->prepare($query, $event_id, $per_page, $offset));
+        
+        $formatted_bookings = array();
+        foreach ($bookings as $booking) {
+            $formatted_bookings[] = $this->format_booking_data($booking);
+        }
+        
+        return new WP_REST_Response($formatted_bookings, 200);
+    }
+    
+    private function format_booking_data($booking) {
+        // Decode attendees info if it's JSON
+        $attendees_info = isset($booking->attendees_info) ? json_decode($booking->attendees_info, true) : array();
+        
+        // Extract primary attendee information
+        $primary_attendee = isset($attendees_info[0]) ? $attendees_info[0] : array();
+        
+        return array(
+            'id' => $booking->id,
+            'event_id' => $booking->event_id,
+            'name' => $primary_attendee['name'] ?? ($booking->first_name . ' ' . $booking->last_name),
+            'first_name' => $booking->first_name ?? $primary_attendee['name'] ?? '',
+            'last_name' => $booking->last_name ?? '',
+            'email' => $booking->email ?? $primary_attendee['email'] ?? '',
+            'phone' => $primary_attendee['tel'] ?? '',
+            'tickets' => $booking->tickets ?? 1,
+            'count' => $booking->tickets ?? 1,
+            'status' => $booking->status ?? 'confirmed',
+            'transaction_id' => $booking->transaction_id ?? '',
+            'date' => $booking->date ?? '',
+            'created_at' => $booking->timestamp ?? '',
+            'price' => $booking->price ?? 0,
+            'attendees_info' => $attendees_info,
+            'raw_booking' => $booking
+        );
     }
     
     private function format_event_data($post_id) {

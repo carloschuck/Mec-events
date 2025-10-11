@@ -633,3 +633,124 @@ export const cleanupOldEvents = async (req, res) => {
     });
   }
 };
+
+/**
+ * Sync bookings/registrations from MEC API
+ * POST /api/mec-api/sync/bookings
+ */
+export const syncBookings = async (req, res) => {
+  try {
+    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    
+    if (!mecApiUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
+      });
+    }
+    
+    console.log('🔄 Starting MEC Bridge API bookings sync...');
+    
+    // Fetch bookings from custom MEC Bridge API endpoint
+    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=1000`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'MEC-Events-App/1.0'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
+    }
+    
+    const bookings = await response.json();
+    
+    if (!Array.isArray(bookings)) {
+      console.log('⚠️  API response is not an array:', typeof bookings);
+      
+      // Check if it's an error response
+      if (bookings.error) {
+        return res.json({
+          success: true,
+          message: bookings.error,
+          data: { total: 0, synced: 0, errors: 0 }
+        });
+      }
+      
+      throw new Error('Invalid API response format');
+    }
+    
+    console.log(`📥 Fetched ${bookings.length} bookings from MEC Bridge API`);
+    
+    let syncedCount = 0;
+    let errorCount = 0;
+    const sourceUrl = mecApiUrl;
+    
+    // Import Registration model
+    const { Registration } = await import('../models/index.js');
+    
+    // Sync each booking to our database
+    for (const booking of bookings) {
+      try {
+        // Find the corresponding event in our database
+        const event = await Event.findOne({
+          where: {
+            mecEventId: String(booking.event_id),
+            sourceUrl
+          }
+        });
+        
+        if (!event) {
+          console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id})`);
+          errorCount++;
+          continue;
+        }
+        
+        // Parse booking data
+        const registrationData = {
+          mecBookingId: String(booking.id),
+          sourceUrl,
+          eventId: event.id,
+          attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
+          attendeeEmail: booking.email || '',
+          attendeePhone: booking.phone || '',
+          numberOfTickets: parseInt(booking.tickets || booking.count || 1),
+          registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+          metadata: booking
+        };
+        
+        // Upsert the registration
+        await Registration.upsert(registrationData, {
+          conflictFields: ['sourceUrl', 'mecBookingId']
+        });
+        
+        syncedCount++;
+        console.log(`✅ Synced booking ${booking.id} for event: ${event.title}`);
+      } catch (error) {
+        console.error(`❌ Error syncing booking ${booking.id}:`, error.message);
+        errorCount++;
+      }
+    }
+    
+    console.log(`✅ Booking sync completed: ${syncedCount} synced, ${errorCount} errors`);
+    
+    res.json({
+      success: true,
+      message: 'Bookings sync completed',
+      data: {
+        total: bookings.length,
+        synced: syncedCount,
+        errors: errorCount
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error syncing bookings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error syncing bookings',
+      error: error.message
+    });
+  }
+};

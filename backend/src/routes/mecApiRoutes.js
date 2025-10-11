@@ -8,6 +8,7 @@ import {
   getEventFees,
   login,
   syncEvents,
+  syncBookings,
   cleanupOldEvents
 } from '../controllers/mecApiController.js';
 
@@ -36,6 +37,9 @@ router.post('/login', login);
 
 // Sync events from MEC API to local database
 router.post('/sync/events', syncEvents);
+
+// Sync bookings/registrations from MEC API to local database
+router.post('/sync/bookings', syncBookings);
 
 // Clean up old events from the database
 router.delete('/cleanup/old-events', cleanupOldEvents);
