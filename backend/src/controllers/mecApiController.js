@@ -683,6 +683,57 @@ export const cleanupSourceUrlDuplicates = async (req, res) => {
 };
 
 /**
+ * Debug endpoint to test booking match for event 37332
+ * GET /api/mec-api/debug/test-booking-match
+ */
+export const debugBookingMatch = async (req, res) => {
+  try {
+    const { Event } = await import('../models/index.js');
+    const testEventId = "37332";
+    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    mecApiUrl = mecApiUrl.replace(/\/$/, '');
+    const sourceUrl = mecApiUrl;
+    
+    // Try to find the event exactly as the booking sync does
+    const eventWithSourceUrl = await Event.findOne({
+      where: {
+        mecEventId: String(testEventId),
+        sourceUrl
+      }
+    });
+    
+    const eventWithoutSourceUrl = await Event.findOne({
+      where: {
+        mecEventId: String(testEventId)
+      }
+    });
+    
+    res.json({
+      success: true,
+      testEventId,
+      sourceUrl,
+      eventWithSourceUrl: eventWithSourceUrl ? {
+        id: eventWithSourceUrl.id,
+        mecEventId: eventWithSourceUrl.mecEventId,
+        sourceUrl: eventWithSourceUrl.sourceUrl,
+        title: eventWithSourceUrl.title
+      } : null,
+      eventWithoutSourceUrl: eventWithoutSourceUrl ? {
+        id: eventWithoutSourceUrl.id,
+        mecEventId: eventWithoutSourceUrl.mecEventId,
+        sourceUrl: eventWithoutSourceUrl.sourceUrl,
+        title: eventWithoutSourceUrl.title
+      } : null
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
  * Debug endpoint to check what event IDs we have in database
  * GET /api/mec-api/debug/event-ids
  */

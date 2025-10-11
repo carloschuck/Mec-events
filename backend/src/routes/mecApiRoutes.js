@@ -11,7 +11,8 @@ import {
   syncBookings,
   cleanupOldEvents,
   cleanupSourceUrlDuplicates,
-  debugEventIds
+  debugEventIds,
+  debugBookingMatch
 } from '../controllers/mecApiController.js';
 
 const router = express.Router();
@@ -51,5 +52,8 @@ router.delete('/cleanup/sourceurl-duplicates', cleanupSourceUrlDuplicates);
 
 // Debug: Get event IDs in database
 router.get('/debug/event-ids', debugEventIds);
+
+// Debug: Test booking match
+router.get('/debug/test-booking-match', debugBookingMatch);
 
 export default router;
