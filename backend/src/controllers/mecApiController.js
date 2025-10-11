@@ -699,7 +699,37 @@ export const syncBookings = async (req, res) => {
         });
         
         if (!event) {
-          console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id})`);
+          console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id}, sourceUrl: ${sourceUrl})`);
+          // Try without trailing slash if not found
+          if (sourceUrl.endsWith('/')) {
+            const altEvent = await Event.findOne({
+              where: {
+                mecEventId: String(booking.event_id),
+                sourceUrl: sourceUrl.slice(0, -1)
+              }
+            });
+            if (altEvent) {
+              console.log(`✅ Found event with alternate sourceUrl (no trailing slash)`);
+              // Use this event
+              const registrationData = {
+                mecBookingId: String(booking.id),
+                sourceUrl,
+                eventId: altEvent.id,
+                attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
+                attendeeEmail: booking.email || '',
+                attendeePhone: booking.phone || '',
+                numberOfTickets: parseInt(booking.tickets || booking.count || 1),
+                registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+                metadata: booking
+              };
+              await Registration.upsert(registrationData, {
+                conflictFields: ['sourceUrl', 'mecBookingId']
+              });
+              syncedCount++;
+              console.log(`✅ Synced booking ${booking.id} for event: ${altEvent.title}`);
+              continue;
+            }
+          }
           errorCount++;
           continue;
         }
