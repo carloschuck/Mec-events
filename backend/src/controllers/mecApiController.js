@@ -1,4 +1,5 @@
 import { Event, Registration } from '../models/index.js';
+import { Op } from 'sequelize';
 
 /**
  * MEC REST API Integration Controller
@@ -561,6 +562,73 @@ export const getConfig = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error getting MEC configuration',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Clean up old events from the database
+ * DELETE /api/mec-api/cleanup/old-events
+ * Query params:
+ *  - daysAgo: number of days ago to consider as old (default: 30)
+ *  - dryRun: if true, only count events without deleting (default: false)
+ */
+export const cleanupOldEvents = async (req, res) => {
+  try {
+    const daysAgo = parseInt(req.query.daysAgo) || 30;
+    const dryRun = req.query.dryRun === 'true';
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+    
+    const { Event } = await import('../models/index.js');
+    
+    if (dryRun) {
+      // Just count how many events would be deleted
+      const count = await Event.count({
+        where: {
+          endDate: {
+            [Op.lt]: cutoffDate
+          }
+        }
+      });
+      
+      return res.json({
+        success: true,
+        message: `Would delete ${count} events older than ${daysAgo} days (before ${cutoffDate.toISOString()})`,
+        data: {
+          count,
+          cutoffDate: cutoffDate.toISOString(),
+          daysAgo,
+          dryRun: true
+        }
+      });
+    }
+    
+    // Actually delete the old events
+    const deletedCount = await Event.destroy({
+      where: {
+        endDate: {
+          [Op.lt]: cutoffDate
+        }
+      }
+    });
+    
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} events older than ${daysAgo} days`,
+      data: {
+        deletedCount,
+        cutoffDate: cutoffDate.toISOString(),
+        daysAgo
+      }
+    });
+  } catch (error) {
+    console.error('Error cleaning up old events:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cleaning up old events',
       error: error.message
     });
   }

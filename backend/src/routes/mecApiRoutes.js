@@ -7,7 +7,8 @@ import {
   getEventTickets,
   getEventFees,
   login,
-  syncEvents
+  syncEvents,
+  cleanupOldEvents
 } from '../controllers/mecApiController.js';
 
 const router = express.Router();
@@ -35,5 +36,8 @@ router.post('/login', login);
 
 // Sync events from MEC API to local database
 router.post('/sync/events', syncEvents);
+
+// Clean up old events from the database
+router.delete('/cleanup/old-events', cleanupOldEvents);
 
 export default router;
