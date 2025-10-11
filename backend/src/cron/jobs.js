@@ -202,12 +202,40 @@ class CronJobs {
     console.log(`📅 Status updates scheduled: ${schedule}`);
   }
 
+  // Clean up old completed events (older than 30 days)
+  scheduleEventCleanup() {
+    const schedule = '0 2 * * *'; // 2 AM daily
+    
+    const job = cron.schedule(schedule, async () => {
+      console.log('🧹 Cleaning up old events...');
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const result = await Event.destroy({
+          where: {
+            endDate: { [Op.lt]: thirtyDaysAgo },
+            status: 'completed'
+          }
+        });
+
+        console.log(`✅ Deleted ${result} old completed events (older than 30 days)`);
+      } catch (error) {
+        console.error('❌ Error cleaning up events:', error.message);
+      }
+    });
+
+    this.jobs.push(job);
+    console.log(`📅 Event cleanup scheduled: ${schedule}`);
+  }
+
   startAll() {
     console.log('\n🚀 Starting all cron jobs...\n');
     this.scheduleMECSync();
     this.scheduleEventReminders();
     this.scheduleFollowUps();
     this.scheduleStatusUpdates();
+    this.scheduleEventCleanup();
     console.log('\n✅ All cron jobs started\n');
   }
 
