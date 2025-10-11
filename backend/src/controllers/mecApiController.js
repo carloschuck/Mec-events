@@ -367,9 +367,14 @@ export const syncEvents = async (req, res) => {
       } else {
         allEvents = allEvents.concat(events);
         page++;
-        // Safety limit - stop after 10 pages (1000 events)
-        if (page > 10) {
-          console.log(`⚠️  Reached page limit (10 pages)`);
+        // Safety limit - stop after 20 pages (2000 events)
+        if (page > 20) {
+          console.log(`⚠️  Reached page limit (20 pages)`);
+          hasMore = false;
+        }
+        // Check if we got less than 100 events, meaning we've reached the end
+        if (events.length < 100) {
+          console.log(`✅ Reached last page (got ${events.length} events)`);
           hasMore = false;
         }
       }
@@ -724,9 +729,10 @@ export const syncBookings = async (req, res) => {
         }
         
         if (!event) {
-          // Only log first 5 errors to avoid spam
-          if (errorCount < 5) {
-            console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: ${booking.event_id}, sourceUrl: ${sourceUrl})`);
+          // Log first 10 errors with full details to help debug
+          if (errorCount < 10) {
+            console.log(`⚠️  Event not found for booking ${booking.id} (MEC Event ID: "${booking.event_id}", type: ${typeof booking.event_id})`);
+            console.log(`   Booking data:`, JSON.stringify(booking).substring(0, 200));
           }
           errorCount++;
           continue;
