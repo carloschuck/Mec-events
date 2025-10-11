@@ -173,13 +173,23 @@ class MEC_API_Bridge {
             return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
         }
         
-        $where = "WHERE 1=1";
+        // Build query with proper escaping
         if ($event_id) {
-            $where .= $wpdb->prepare(" AND event_id = %d", $event_id);
+            $query = $wpdb->prepare(
+                "SELECT * FROM $table_name WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d",
+                intval($event_id),
+                intval($per_page),
+                intval($offset)
+            );
+        } else {
+            $query = $wpdb->prepare(
+                "SELECT * FROM $table_name ORDER BY id DESC LIMIT %d OFFSET %d",
+                intval($per_page),
+                intval($offset)
+            );
         }
         
-        $query = "SELECT * FROM $table_name $where ORDER BY id DESC LIMIT %d OFFSET %d";
-        $bookings = $wpdb->get_results($wpdb->prepare($query, $per_page, $offset));
+        $bookings = $wpdb->get_results($query);
         
         $formatted_bookings = array();
         foreach ($bookings as $booking) {
@@ -204,8 +214,13 @@ class MEC_API_Bridge {
             return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
         }
         
-        $query = "SELECT * FROM $table_name WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d";
-        $bookings = $wpdb->get_results($wpdb->prepare($query, $event_id, $per_page, $offset));
+        $query = $wpdb->prepare(
+            "SELECT * FROM $table_name WHERE event_id = %d ORDER BY id DESC LIMIT %d OFFSET %d",
+            intval($event_id),
+            intval($per_page),
+            intval($offset)
+        );
+        $bookings = $wpdb->get_results($query);
         
         $formatted_bookings = array();
         foreach ($bookings as $booking) {
