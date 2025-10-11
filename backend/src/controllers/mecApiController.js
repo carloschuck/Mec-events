@@ -724,6 +724,38 @@ export const debugSyncOneBooking = async (req, res) => {
       });
     }
     
+    let registrationResult = null;
+    if (event) {
+      try {
+        const registrationData = {
+          mecBookingId: String(booking.id),
+          sourceUrl,
+          eventId: event.id,
+          attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
+          attendeeEmail: booking.email || '',
+          attendeePhone: booking.phone || '',
+          numberOfTickets: parseInt(booking.tickets || booking.count || 1),
+          registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+          metadata: booking
+        };
+        
+        const result = await Registration.upsert(registrationData, {
+          conflictFields: ['sourceUrl', 'mecBookingId']
+        });
+        
+        registrationResult = {
+          success: true,
+          data: registrationData,
+          result: result
+        };
+      } catch (error) {
+        registrationResult = {
+          success: false,
+          error: error.message
+        };
+      }
+    }
+    
     res.json({
       success: true,
       booking: {
@@ -738,7 +770,8 @@ export const debugSyncOneBooking = async (req, res) => {
         title: event.title,
         sourceUrl: event.sourceUrl
       } : null,
-      sourceUrl
+      sourceUrl,
+      registrationResult
     });
   } catch (error) {
     res.status(500).json({
