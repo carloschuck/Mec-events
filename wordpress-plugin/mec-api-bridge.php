@@ -170,7 +170,8 @@ class MEC_API_Bridge {
         
         // Check if table exists
         if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-            return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
+            // Return empty array instead of error - bookings addon may not be installed
+            return new WP_REST_Response(array(), 200);
         }
         
         // Build query with proper escaping
@@ -211,7 +212,8 @@ class MEC_API_Bridge {
         
         // Check if table exists
         if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-            return new WP_REST_Response(array('error' => 'MEC bookings table not found'), 404);
+            // Return empty array instead of error - bookings addon may not be installed
+            return new WP_REST_Response(array(), 200);
         }
         
         $query = $wpdb->prepare(
