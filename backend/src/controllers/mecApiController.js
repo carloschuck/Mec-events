@@ -327,11 +327,11 @@ export const syncEvents = async (req, res) => {
     
     console.log('🔄 Starting MEC Bridge API events sync...');
     
-    // Calculate date range: past 6 months to future 12 months (to match bookings with events)
+    // Calculate date range: past 12 months to future 12 months (to match bookings with events)
     const today = new Date();
-    const sixMonthsAgo = new Date(today);
-    sixMonthsAgo.setMonth(today.getMonth() - 6);
-    const startDate = sixMonthsAgo.toISOString().split('T')[0]; // YYYY-MM-DD
+    const twelveMonthsAgo = new Date(today);
+    twelveMonthsAgo.setMonth(today.getMonth() - 12);
+    const startDate = twelveMonthsAgo.toISOString().split('T')[0]; // YYYY-MM-DD
     const endDate = new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()).toISOString().split('T')[0];
     
     console.log(`📅 Fetching events from ${startDate} to ${endDate}`);
