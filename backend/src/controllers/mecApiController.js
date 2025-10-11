@@ -878,21 +878,42 @@ export const syncBookings = async (req, res) => {
     
     console.log('🔄 Starting MEC Bridge API bookings sync...');
     
-    // Fetch bookings from custom MEC Bridge API endpoint (test with 10 first)
-    const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=10`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'MEC-Events-App/1.0'
-      }
-    });
+    // Fetch all bookings with pagination
+    let allBookings = [];
+    let page = 1;
+    let hasMore = true;
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
+    while (hasMore) {
+      const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=100&page=${page}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'MEC-Events-App/1.0'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const bookings = await response.json();
+      
+      if (bookings.length === 0) {
+        hasMore = false;
+      } else {
+        allBookings = allBookings.concat(bookings);
+        page++;
+        if (page > 60) { // Safety limit for 6000 bookings
+          hasMore = false;
+        }
+        if (bookings.length < 100) { // Early termination
+          hasMore = false;
+        }
+      }
     }
     
-    const bookings = await response.json();
+    const bookings = allBookings;
     
     if (!Array.isArray(bookings)) {
       console.log('⚠️  API response is not an array:', typeof bookings);
