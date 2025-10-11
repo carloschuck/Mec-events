@@ -7,7 +7,8 @@ import {
   User, 
   LogOut,
   Menu,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -24,6 +25,7 @@ const Layout = () => {
   const navigation = [
     { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { name: 'Events', to: '/events', icon: Calendar },
+    { name: 'Attendees', to: '/attendees', icon: Users },
     { name: 'Check-In', to: '/checkin', icon: QrCode },
   ];
 

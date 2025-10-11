@@ -8,6 +8,7 @@ import Events from './pages/Events';
 import EventDetail from './pages/EventDetail';
 import CheckIn from './pages/CheckIn';
 import Profile from './pages/Profile';
+import Attendees from './pages/Attendees';
 
 // Components
 import Layout from './components/Layout';
@@ -27,6 +28,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/events" element={<Events />} />
         <Route path="/events/:id" element={<EventDetail />} />
+        <Route path="/attendees" element={<Attendees />} />
         <Route path="/checkin" element={<CheckIn />} />
         <Route path="/profile" element={<Profile />} />
       </Route>
