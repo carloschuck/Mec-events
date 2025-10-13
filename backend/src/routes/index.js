@@ -21,6 +21,39 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Database health check endpoint
+router.get('/db-health', async (req, res) => {
+  try {
+    console.log('📝 Database health endpoint called');
+    const { sequelize } = await import('../models/index.js');
+    
+    // Test database connection
+    await sequelize.authenticate();
+    
+    // Check if admin user exists
+    const { User } = await import('../models/index.js');
+    const adminUser = await User.findOne({ 
+      where: { email: 'admin@housesoflight.org' } 
+    });
+    
+    res.json({
+      success: true,
+      message: 'Database connection is healthy',
+      timestamp: new Date().toISOString(),
+      adminUserExists: !!adminUser,
+      adminUserEmail: adminUser ? adminUser.email : null
+    });
+  } catch (error) {
+    console.error('❌ Database health check failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Database connection failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Mount all route modules
 console.log('🔄 Mounting route modules...');
 router.use('/auth', authRoutes);
