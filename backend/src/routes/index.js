@@ -81,6 +81,31 @@ router.delete('/admin-user', async (req, res) => {
   }
 });
 
+// Sync bookings endpoint
+router.post('/sync-bookings', async (req, res) => {
+  try {
+    console.log('🔄 Manual booking sync endpoint called');
+    
+    // Import the sync script
+    const syncProductionBookings = await import('../scripts/sync-production-bookings.js');
+    
+    // Run the sync
+    await syncProductionBookings.default();
+    
+    res.json({
+      success: true,
+      message: 'Booking sync completed successfully'
+    });
+  } catch (error) {
+    console.error('❌ Booking sync failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Booking sync failed',
+      error: error.message
+    });
+  }
+});
+
 // Debug: List all registered routes
 console.log('🔍 Registered routes:');
 router.stack.forEach((layer) => {
