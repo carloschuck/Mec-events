@@ -972,36 +972,94 @@ export const syncBookings = async (req, res) => {
           continue;
         }
         
-        // Parse booking data
-        const attendeeName = booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
-        const attendeeEmail = booking.email || '';
-        
-        // Skip bookings with invalid email (required field with validation)
-        if (!attendeeEmail || !attendeeEmail.includes('@')) {
-          console.log(`⚠️  Skipping booking ${booking.id} - invalid email: "${attendeeEmail}"`);
-          errorCount++;
-          continue;
+        // Process multiple attendees from attendees_info array
+        const attendeesInfo = booking.attendees_info || [];
+        let bookingSynced = 0;
+        let bookingErrors = 0;
+
+        if (attendeesInfo.length > 0) {
+          // Process each attendee in the attendees_info array
+          for (let i = 0; i < attendeesInfo.length; i++) {
+            const attendee = attendeesInfo[i];
+            
+            // Parse attendee data
+            const attendeeName = attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim();
+            const attendeeEmail = attendee.email || '';
+            
+            // Skip attendees with invalid email
+            if (!attendeeEmail || !attendeeEmail.includes('@')) {
+              console.log(`⚠️  Skipping attendee ${i + 1} in booking ${booking.id} - invalid email: "${attendeeEmail}"`);
+              bookingErrors++;
+              continue;
+            }
+
+            const registrationData = {
+              mecBookingId: String(booking.id),
+              sourceUrl,
+              eventId: event.id,
+              attendeeName: attendeeName || 'Unknown',
+              attendeeEmail: attendeeEmail,
+              attendeePhone: attendee.tel || attendee.phone || '',
+              numberOfTickets: 1, // Each attendee gets 1 ticket
+              registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+              metadata: {
+                ...booking,
+                attendeeIndex: i,
+                totalAttendees: attendeesInfo.length
+              }
+            };
+
+            // Upsert the registration with unique conflict fields
+            await Registration.upsert(registrationData, {
+              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeEmail']
+            });
+
+            bookingSynced++;
+            console.log(`✅ Synced attendee ${i + 1}/${attendeesInfo.length} from booking ${booking.id}: ${attendeeName}`);
+          }
+        } else {
+          // Fallback to single attendee (legacy booking format)
+          const attendeeName = booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+          const attendeeEmail = booking.email || '';
+          
+          // Skip bookings with invalid email
+          if (!attendeeEmail || !attendeeEmail.includes('@')) {
+            console.log(`⚠️  Skipping booking ${booking.id} - invalid email: "${attendeeEmail}"`);
+            bookingErrors++;
+            continue;
+          }
+
+          const registrationData = {
+            mecBookingId: String(booking.id),
+            sourceUrl,
+            eventId: event.id,
+            attendeeName: attendeeName || 'Unknown',
+            attendeeEmail: attendeeEmail,
+            attendeePhone: booking.phone || '',
+            numberOfTickets: parseInt(booking.tickets || booking.count || 1),
+            registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+            metadata: {
+              ...booking,
+              attendeeIndex: 0,
+              totalAttendees: 1
+            }
+          };
+
+          // Upsert the registration
+          await Registration.upsert(registrationData, {
+            conflictFields: ['sourceUrl', 'mecBookingId']
+          });
+
+          bookingSynced++;
+          console.log(`✅ Synced single attendee from booking ${booking.id}: ${attendeeName}`);
         }
+
+        syncedCount += bookingSynced;
+        errorCount += bookingErrors;
         
-        const registrationData = {
-          mecBookingId: String(booking.id),
-          sourceUrl,
-          eventId: event.id,
-          attendeeName: attendeeName || 'Unknown',
-          attendeeEmail: attendeeEmail,
-          attendeePhone: booking.phone || '',
-          numberOfTickets: parseInt(booking.tickets || booking.count || 1),
-          registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
-          metadata: booking
-        };
-        
-        // Upsert the registration
-        await Registration.upsert(registrationData, {
-          conflictFields: ['sourceUrl', 'mecBookingId']
-        });
-        
-        syncedCount++;
-        console.log(`✅ Synced booking ${booking.id} for event: ${event.title}`);
+        if (bookingSynced > 0) {
+          console.log(`✅ Booking ${booking.id} processed: ${bookingSynced} attendees synced, ${bookingErrors} errors`);
+        }
       } catch (error) {
         console.error(`❌ Error syncing booking ${booking.id}:`, error.message);
         errorCount++;
