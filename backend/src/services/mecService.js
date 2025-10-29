@@ -5,21 +5,27 @@ class MECService {
   constructor() {
     this.baseURL = process.env.MEC_API_URL;
     this.apiKey = process.env.MEC_API_KEY;
-    this.axiosInstance = axios.create({
-      baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/wp/v2`,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
+    
+    // Only create axios instance if baseURL is available
+    if (this.baseURL) {
+      this.axiosInstance = axios.create({
+        baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/wp/v2`,
+        timeout: 30000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+    } else {
+      this.axiosInstance = null;
+    }
 
     // Add MEC API token header if provided (for MEC-specific endpoints)
-    if (this.apiKey) {
+    if (this.apiKey && this.axiosInstance) {
       this.axiosInstance.defaults.headers.common['mec-token'] = this.apiKey;
     }
 
     // Add basic auth if credentials provided
-    if (process.env.MEC_API_AUTH_USER && process.env.MEC_API_AUTH_PASS) {
+    if (process.env.MEC_API_AUTH_USER && process.env.MEC_API_AUTH_PASS && this.axiosInstance) {
       this.axiosInstance.defaults.auth = {
         username: process.env.MEC_API_AUTH_USER,
         password: process.env.MEC_API_AUTH_PASS
@@ -29,6 +35,10 @@ class MECService {
 
   async testConnection() {
     try {
+      if (!this.axiosInstance) {
+        throw new Error('MEC API URL not configured');
+      }
+      
       const response = await this.axiosInstance.get('/mec-events?per_page=1');
       console.log('✅ WordPress REST API connection successful');
       return { 
@@ -88,11 +98,58 @@ class MECService {
 
   async fetchBookings() {
     try {
-      const response = await this.axiosInstance.get('/bookings');
-      return response.data;
+      // Use MEC Bridge API endpoint instead of WordPress REST API
+      let mecApiUrl = this.baseURL?.replace('/wp-json/mec/v1.0', '');
+      
+      if (!mecApiUrl) {
+        throw new Error('MEC API URL not configured');
+      }
+      
+      // Normalize sourceUrl - remove trailing slash for consistency
+      mecApiUrl = mecApiUrl.replace(/\/$/, '');
+      
+      console.log(`🔄 Fetching bookings from MEC Bridge API: ${mecApiUrl}/wp-json/mec-bridge/v1/bookings`);
+      
+      // Fetch all bookings with pagination
+      let allBookings = [];
+      let page = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=100&page=${page}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'MEC-Events-App/1.0'
+          }
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ MEC Bridge API error: ${response.status} ${response.statusText}`, errorText);
+          throw new Error(`MEC Bridge API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const bookings = await response.json();
+        
+        if (bookings.length === 0) {
+          hasMore = false;
+        } else {
+          allBookings = allBookings.concat(bookings);
+          page++;
+          if (page > 60) { // Safety limit for 6000 bookings
+            hasMore = false;
+          }
+          if (bookings.length < 100) { // Early termination
+            hasMore = false;
+          }
+        }
+      }
+      
+      console.log(`✅ Fetched ${allBookings.length} bookings from MEC Bridge API`);
+      return allBookings;
     } catch (error) {
-      console.error('Error fetching bookings from MEC:', error.message);
-      throw new Error('Failed to fetch bookings from MEC API');
+      console.error('Error fetching bookings from MEC Bridge API:', error.message);
+      throw new Error('Failed to fetch bookings from MEC Bridge API');
     }
   }
 
@@ -217,6 +274,7 @@ class MECService {
         return { synced: 0, errors: 0 };
       }
 
+      console.log(`📝 Processing ${mecBookings.length} bookings...`);
       let synced = 0;
       let errors = 0;
 
@@ -231,7 +289,18 @@ class MECService {
           });
 
           if (!event) {
-            console.log(`Event not found for booking ${booking.id} from ${site_url}`);
+            console.log(`⚠️  Event not found for booking ${booking.id} (Event ID: ${booking.event_id})`);
+            errors++;
+            continue;
+          }
+
+          // Parse booking data
+          const attendeeName = booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim();
+          const attendeeEmail = booking.email || '';
+          
+          // Skip bookings with invalid email (required field with validation)
+          if (!attendeeEmail || !attendeeEmail.includes('@')) {
+            console.log(`⚠️  Skipping booking ${booking.id} - invalid email: "${attendeeEmail}"`);
             errors++;
             continue;
           }
@@ -240,29 +309,31 @@ class MECService {
             mecBookingId: String(booking.id),
             sourceUrl: site_url,
             eventId: event.id,
-            attendeeName: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim(),
-            attendeeEmail: booking.email,
+            attendeeName: attendeeName || 'Unknown',
+            attendeeEmail: attendeeEmail,
             attendeePhone: booking.phone || '',
             numberOfTickets: parseInt(booking.tickets || booking.count || 1),
-            registrationDate: new Date(booking.date || booking.created_at),
+            registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
             metadata: booking
           };
 
+          // Upsert the registration
           await Registration.upsert(registrationData, {
             conflictFields: ['sourceUrl', 'mecBookingId']
           });
 
           synced++;
+          console.log(`✅ Synced booking ${booking.id} for event: ${event.title}`);
         } catch (error) {
-          console.error(`Error syncing booking ${booking.id}:`, error.message);
+          console.error(`❌ Error syncing booking ${booking.id}:`, error.message);
           errors++;
         }
       }
 
-      console.log(`✅ Synced ${synced} bookings from ${site_url}, ${errors} errors`);
+      console.log(`✅ Booking sync completed: ${synced} synced, ${errors} errors`);
       return { synced, errors };
     } catch (error) {
-      console.error('Error in syncBookings:', error.message);
+      console.error('❌ Error in syncBookings:', error.message);
       throw error;
     }
   }
