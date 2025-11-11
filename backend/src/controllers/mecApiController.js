@@ -1114,3 +1114,134 @@ export const syncBookings = async (req, res) => {
     });
   }
 };
+
+/**
+ * Debug endpoint to analyze bookings for a specific event
+ * GET /api/mec-api/debug/event-bookings/:eventId
+ */
+export const debugEventBookings = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const mecApiUrl = getSanitizedMecApiUrl();
+    const sourceUrl = mecApiUrl;
+
+    // Find the event in our database
+    const event = await Event.findByPk(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found in database'
+      });
+    }
+
+    // Get all bookings from WordPress for this event
+    let allBookings = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await fetch(`${mecApiUrl}/wp-json/mec-bridge/v1/bookings?per_page=100&page=${page}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'MEC-Events-App/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const bookings = await response.json();
+      
+      if (bookings.length === 0) {
+        hasMore = false;
+      } else {
+        // Filter bookings for this specific event
+        const eventBookings = bookings.filter(b => String(b.event_id) === String(event.mecEventId));
+        allBookings = allBookings.concat(eventBookings);
+        
+        page++;
+        if (page > 60 || bookings.length < 100) {
+          hasMore = false;
+        }
+      }
+    }
+
+    // Count total attendees from WordPress
+    let wordpressAttendeeCount = 0;
+    const bookingDetails = [];
+
+    for (const booking of allBookings) {
+      const attendeesInfo = booking.attendees_info || [];
+      let attendeeCount = 0;
+
+      if (attendeesInfo.length > 0) {
+        attendeeCount = attendeesInfo.filter(a => a.email && a.email.includes('@')).length;
+      } else {
+        const ticketCount = parseInt(booking.tickets || booking.count || 1);
+        const hasValidEmail = booking.email && booking.email.includes('@');
+        attendeeCount = hasValidEmail ? ticketCount : 0;
+      }
+
+      wordpressAttendeeCount += attendeeCount;
+
+      bookingDetails.push({
+        bookingId: booking.id,
+        attendeeCount,
+        hasAttendeesInfo: attendeesInfo.length > 0,
+        attendeesInfoLength: attendeesInfo.length,
+        tickets: booking.tickets || booking.count || 1,
+        email: booking.email,
+        name: booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim()
+      });
+    }
+
+    // Count registrations in our database
+    const registrations = await Registration.findAll({
+      where: { eventId: event.id }
+    });
+
+    const dbAttendeeCount = registrations.length;
+
+    // Find missing bookings
+    const dbBookingIds = new Set(registrations.map(r => r.mecBookingId));
+    const missingBookings = allBookings.filter(b => !dbBookingIds.has(String(b.id)));
+
+    res.json({
+      success: true,
+      event: {
+        id: event.id,
+        title: event.title,
+        mecEventId: event.mecEventId,
+        sourceUrl: event.sourceUrl
+      },
+      wordpress: {
+        totalBookings: allBookings.length,
+        totalAttendees: wordpressAttendeeCount,
+        bookingDetails
+      },
+      database: {
+        totalRegistrations: dbAttendeeCount
+      },
+      discrepancy: {
+        missing: wordpressAttendeeCount - dbAttendeeCount,
+        missingBookings: missingBookings.length,
+        missingBookingDetails: missingBookings.map(b => ({
+          bookingId: b.id,
+          eventId: b.event_id,
+          email: b.email,
+          name: b.name || `${b.first_name || ''} ${b.last_name || ''}`.trim(),
+          attendeesInfoLength: (b.attendees_info || []).length,
+          tickets: b.tickets || b.count || 1
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Error debugging event bookings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error debugging event bookings',
+      error: error.message
+    });
+  }
+};

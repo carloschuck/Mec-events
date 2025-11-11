@@ -13,7 +13,8 @@ import {
   cleanupSourceUrlDuplicates,
   debugEventIds,
   debugBookingMatch,
-  debugSyncOneBooking
+  debugSyncOneBooking,
+  debugEventBookings
 } from '../controllers/mecApiController.js';
 
 const router = express.Router();
@@ -59,5 +60,8 @@ router.get('/debug/test-booking-match', debugBookingMatch);
 
 // Debug: Test syncing one booking
 router.post('/debug/sync-one-booking', debugSyncOneBooking);
+
+// Debug: Analyze bookings for a specific event
+router.get('/debug/event-bookings/:eventId', debugEventBookings);
 
 export default router;
