@@ -956,7 +956,7 @@ export const syncBookings = async (req, res) => {
     
     let syncedCount = 0;
     let errorCount = 0;
-    const sourceUrl = mecApiUrl;
+    const sourceUrl = normalizeSourceUrl(mecApiUrl);
     
     // Import Registration model
     const { Registration } = await import('../models/index.js');
