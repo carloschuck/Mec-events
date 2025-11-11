@@ -995,14 +995,40 @@ export const syncBookings = async (req, res) => {
         }
         
         // Process multiple attendees from attendees_info array
-        const attendeesInfo = booking.attendees_info || [];
-        const ticketCount = parseInt(booking.tickets || booking.count || booking.seats || 1, 10);
+        let attendeesInfo = booking.attendees_info || [];
+        
+        // Fallback: If attendees_info is empty but debug_attendees exists, use that
+        if (attendeesInfo.length === 0 && booking.debug_attendees && Array.isArray(booking.debug_attendees) && booking.debug_attendees.length > 0) {
+          console.log(`🔍 Using debug_attendees for booking ${booking.id} (${booking.debug_attendees.length} attendees)`);
+          attendeesInfo = booking.debug_attendees.map(attendee => ({
+            name: attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim(),
+            first_name: attendee.first_name || '',
+            last_name: attendee.last_name || '',
+            email: attendee.email || attendee.user_email || '',
+            tel: attendee.tel || attendee.phone || '',
+            phone: attendee.phone || attendee.tel || ''
+          }));
+        }
+        
+        // Get ticket count - check raw_booking.seats if available, otherwise use tickets/count
+        let ticketCount = parseInt(booking.tickets || booking.count || 1, 10);
+        if (booking.raw_booking && booking.raw_booking.seats) {
+          const seatsCount = parseInt(booking.raw_booking.seats, 10);
+          if (seatsCount > ticketCount) {
+            ticketCount = seatsCount;
+          }
+        }
+        // If we have attendees_info, use that count instead
+        if (attendeesInfo.length > 0) {
+          ticketCount = attendeesInfo.length;
+        }
+        
         let bookingSynced = 0;
         let bookingErrors = 0;
 
         // Log bookings with multiple tickets/attendees for debugging
         if (ticketCount > 1 || attendeesInfo.length > 1) {
-          console.log(`🔍 Multi-attendee booking ${booking.id} for event ${event.mecEventId}: tickets=${ticketCount}, attendees_info.length=${attendeesInfo.length}`);
+          console.log(`🔍 Multi-attendee booking ${booking.id} for event ${event.mecEventId}: tickets=${ticketCount}, attendees_info.length=${attendeesInfo.length}, raw_booking.seats=${booking.raw_booking?.seats || 'N/A'}`);
         }
 
         if (attendeesInfo.length > 0) {
@@ -1058,7 +1084,8 @@ export const syncBookings = async (req, res) => {
             continue;
           }
 
-          // ticketCount already defined above
+          // ticketCount already defined above - use it to create multiple registrations
+          // This handles bookings where attendees_info is empty but ticketCount/seats > 1
           for (let i = 0; i < ticketCount; i++) {
             const registrationData = {
               mecBookingId: String(booking.id),
@@ -1073,7 +1100,8 @@ export const syncBookings = async (req, res) => {
               metadata: {
                 ...booking,
                 attendeeIndex: i,
-                totalAttendees: ticketCount
+                totalAttendees: ticketCount,
+                note: ticketCount > 1 ? 'Multiple seats - individual attendee info not available' : undefined
               }
             };
 
@@ -1083,6 +1111,10 @@ export const syncBookings = async (req, res) => {
             });
 
             bookingSynced++;
+          }
+          
+          if (ticketCount > 1) {
+            console.log(`✅ Created ${ticketCount} registration(s) from booking ${booking.id} with ${ticketCount} seat(s)`);
           }
 
           console.log(`✅ Synced ${ticketCount} attendee(s) from booking ${booking.id}: ${attendeeName}`);
