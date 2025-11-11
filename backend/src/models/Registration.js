@@ -42,6 +42,12 @@ const Registration = sequelize.define('Registration', {
     type: DataTypes.INTEGER,
     defaultValue: 1
   },
+  attendeeIndex: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    comment: 'Zero-based index for multi-attendee bookings'
+  },
   registrationDate: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
@@ -92,9 +98,10 @@ const Registration = sequelize.define('Registration', {
     { fields: ['attendeeEmail'] },
     { fields: ['checkedIn'] },
     { fields: ['registrationDate'] },
+    { fields: ['attendeeIndex'] },
     {
       unique: true,
-      fields: ['sourceUrl', 'mecBookingId'],
+      fields: ['sourceUrl', 'mecBookingId', 'attendeeIndex'],
       name: 'unique_booking_per_site'
     }
   ]

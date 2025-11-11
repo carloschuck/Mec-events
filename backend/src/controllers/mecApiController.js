@@ -1023,6 +1023,7 @@ export const syncBookings = async (req, res) => {
               attendeeEmail: attendeeEmail,
               attendeePhone: attendee.tel || attendee.phone || '',
               numberOfTickets: 1, // Each attendee gets 1 ticket
+              attendeeIndex: i,
               registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
               metadata: {
                 ...booking,
@@ -1033,7 +1034,7 @@ export const syncBookings = async (req, res) => {
 
             // Upsert the registration with unique conflict fields
             await Registration.upsert(registrationData, {
-              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeEmail']
+              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
             });
 
             bookingSynced++;
@@ -1051,29 +1052,34 @@ export const syncBookings = async (req, res) => {
             continue;
           }
 
-          const registrationData = {
-            mecBookingId: String(booking.id),
-            sourceUrl,
-            eventId: event.id,
-            attendeeName: attendeeName || 'Unknown',
-            attendeeEmail: attendeeEmail,
-            attendeePhone: booking.phone || '',
-            numberOfTickets: parseInt(booking.tickets || booking.count || 1),
-            registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
-            metadata: {
-              ...booking,
-              attendeeIndex: 0,
-              totalAttendees: 1
-            }
-          };
+          const ticketCount = Math.max(parseInt(booking.tickets || booking.count || booking.seats || 1, 10), 1);
+          for (let i = 0; i < ticketCount; i++) {
+            const registrationData = {
+              mecBookingId: String(booking.id),
+              sourceUrl,
+              eventId: event.id,
+              attendeeName: ticketCount > 1 ? `${attendeeName || 'Unknown'} (Seat ${i + 1})` : (attendeeName || 'Unknown'),
+              attendeeEmail: attendeeEmail,
+              attendeePhone: booking.phone || '',
+              numberOfTickets: 1,
+              attendeeIndex: i,
+              registrationDate: booking.date ? new Date(booking.date) : (booking.created_at ? new Date(booking.created_at) : new Date()),
+              metadata: {
+                ...booking,
+                attendeeIndex: i,
+                totalAttendees: ticketCount
+              }
+            };
 
-          // Upsert the registration
-          await Registration.upsert(registrationData, {
-            conflictFields: ['sourceUrl', 'mecBookingId']
-          });
+            // Upsert the registration
+            await Registration.upsert(registrationData, {
+              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
+            });
 
-          bookingSynced++;
-          console.log(`✅ Synced single attendee from booking ${booking.id}: ${attendeeName}`);
+            bookingSynced++;
+          }
+
+          console.log(`✅ Synced ${ticketCount} attendee(s) from booking ${booking.id}: ${attendeeName}`);
         }
 
         syncedCount += bookingSynced;

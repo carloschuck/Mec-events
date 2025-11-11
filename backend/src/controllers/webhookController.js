@@ -178,24 +178,80 @@ async function handleBookingWebhook(data, site_url) {
       return;
     }
 
-    // Parse booking data
-    const registrationRecord = {
-      mecBookingId: String(booking_id),
-      sourceUrl: site_url,
-      eventId: event.id,
-      attendeeName: booking_data.name || `${booking_data.first_name || ''} ${booking_data.last_name || ''}`.trim(),
-      attendeeEmail: booking_data.email || '',
-      attendeePhone: booking_data.phone || '',
-      numberOfTickets: parseInt(booking_data.tickets || booking_data.count || 1),
-      registrationDate: booking_data.date ? new Date(booking_data.date) : new Date(),
-      metadata: booking_data
-    };
+    const attendeesInfo = booking_data.attendees_info || [];
+    let processed = 0;
 
-    await Registration.upsert(registrationRecord, {
-      conflictFields: ['sourceUrl', 'mecBookingId']
-    });
+    if (attendeesInfo.length > 0) {
+      for (let i = 0; i < attendeesInfo.length; i++) {
+        const attendee = attendeesInfo[i];
+        const attendeeName = attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim() || 'Unknown';
+        const attendeeEmail = attendee.email || booking_data.email || '';
 
-    console.log(`✅ Booking ${booking_id} synced from ${site_url} for event: ${event.title}`);
+        if (!attendeeEmail || !attendeeEmail.includes('@')) {
+          console.log(`⚠️  Skipping webhook attendee ${i + 1} for booking ${booking_id} - invalid email: "${attendeeEmail}"`);
+          continue;
+        }
+
+        const registrationRecord = {
+          mecBookingId: String(booking_id),
+          sourceUrl: site_url,
+          eventId: event.id,
+          attendeeName,
+          attendeeEmail,
+          attendeePhone: attendee.tel || attendee.phone || booking_data.phone || '',
+          numberOfTickets: 1,
+          attendeeIndex: i,
+          registrationDate: booking_data.date ? new Date(booking_data.date) : new Date(),
+          metadata: {
+            ...booking_data,
+            attendeeIndex: i,
+            totalAttendees: attendeesInfo.length
+          }
+        };
+
+        await Registration.upsert(registrationRecord, {
+          conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
+        });
+
+        processed++;
+      }
+    } else {
+      const attendeeName = booking_data.name || `${booking_data.first_name || ''} ${booking_data.last_name || ''}`.trim() || 'Unknown';
+      const attendeeEmail = booking_data.email || '';
+
+      if (!attendeeEmail || !attendeeEmail.includes('@')) {
+        console.log(`⚠️  Skipping webhook booking ${booking_id} - invalid email: "${attendeeEmail}"`);
+        return;
+      }
+
+      const ticketCount = Math.max(parseInt(booking_data.tickets || booking_data.count || booking_data.seats || 1, 10), 1);
+      for (let i = 0; i < ticketCount; i++) {
+        const registrationRecord = {
+          mecBookingId: String(booking_id),
+          sourceUrl: site_url,
+          eventId: event.id,
+          attendeeName: ticketCount > 1 ? `${attendeeName} (Seat ${i + 1})` : attendeeName,
+          attendeeEmail,
+          attendeePhone: booking_data.phone || '',
+          numberOfTickets: 1,
+          attendeeIndex: i,
+          registrationDate: booking_data.date ? new Date(booking_data.date) : new Date(),
+          metadata: {
+            ...booking_data,
+            attendeeIndex: i,
+            totalAttendees: ticketCount
+          }
+        };
+
+        await Registration.upsert(registrationRecord, {
+          conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
+        });
+
+        processed++;
+      }
+    }
+
+    console.log(`✅ Booking ${booking_id} synced from ${site_url} for event: ${event.title} (${processed} attendees)`);
   } catch (error) {
     console.error('Error handling booking webhook:', error);
   }

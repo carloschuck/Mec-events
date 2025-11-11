@@ -38,36 +38,87 @@ async function syncProductionBookings() {
           continue;
         }
 
-        // Check if registration already exists
-        const existingRegistration = await Registration.findOne({
-          where: {
-            mecBookingId: String(booking.id),
-            sourceUrl: baseURL
-          }
-        });
+        const attendeesInfo = booking.attendees_info || [];
+        let processed = 0;
 
-        if (existingRegistration) {
-          console.log(`⏭️  Registration already exists for booking ${booking.id}`);
-          skipped++;
-          continue;
+        if (attendeesInfo.length > 0) {
+          for (let i = 0; i < attendeesInfo.length; i++) {
+            const attendee = attendeesInfo[i];
+            const attendeeName = attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim() || 'Unknown';
+            const attendeeEmail = attendee.email || booking.email || '';
+
+            if (!attendeeEmail || !attendeeEmail.includes('@')) {
+              console.log(`⚠️  Skipping attendee ${i + 1} for booking ${booking.id} - invalid email: "${attendeeEmail}"`);
+              errors++;
+              continue;
+            }
+
+            const registrationData = {
+              mecBookingId: String(booking.id),
+              sourceUrl: baseURL,
+              eventId: event.id,
+              attendeeName,
+              attendeeEmail,
+              attendeePhone: attendee.tel || attendee.phone || booking.phone || '',
+              numberOfTickets: 1,
+              attendeeIndex: i,
+              registrationDate: booking.date ? new Date(booking.date) : new Date(),
+              metadata: {
+                ...booking,
+                attendeeIndex: i,
+                totalAttendees: attendeesInfo.length
+              }
+            };
+
+            await Registration.upsert(registrationData, {
+              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
+            });
+
+            processed++;
+          }
+        } else {
+          const attendeeName = booking.name || `${booking.first_name || ''} ${booking.last_name || ''}`.trim() || 'Unknown';
+          const attendeeEmail = booking.email || '';
+
+          if (!attendeeEmail || !attendeeEmail.includes('@')) {
+            console.log(`⚠️  Skipping booking ${booking.id} - invalid email: "${attendeeEmail}"`);
+            errors++;
+            continue;
+          }
+
+          const ticketCount = Math.max(parseInt(booking.tickets || booking.count || booking.seats || 1, 10), 1);
+          for (let i = 0; i < ticketCount; i++) {
+            const registrationData = {
+              mecBookingId: String(booking.id),
+              sourceUrl: baseURL,
+              eventId: event.id,
+              attendeeName: ticketCount > 1 ? `${attendeeName} (Seat ${i + 1})` : attendeeName,
+              attendeeEmail,
+              attendeePhone: booking.phone || '',
+              numberOfTickets: 1,
+              attendeeIndex: i,
+              registrationDate: booking.date ? new Date(booking.date) : new Date(),
+              metadata: {
+                ...booking,
+                attendeeIndex: i,
+                totalAttendees: ticketCount
+              }
+            };
+
+            await Registration.upsert(registrationData, {
+              conflictFields: ['sourceUrl', 'mecBookingId', 'attendeeIndex']
+            });
+
+            processed++;
+          }
         }
 
-        // Create registration record
-        const registrationData = {
-          mecBookingId: String(booking.id),
-          sourceUrl: baseURL,
-          eventId: event.id,
-          attendeeName: booking.name || 'Unknown',
-          attendeeEmail: booking.email || '',
-          attendeePhone: booking.phone || '',
-          numberOfTickets: parseInt(booking.tickets || booking.count || 1),
-          registrationDate: booking.date ? new Date(booking.date) : new Date(),
-          metadata: booking
-        };
-
-        await Registration.create(registrationData);
-        console.log(`✅ Synced booking ${booking.id}: ${registrationData.attendeeName} (${registrationData.attendeeEmail}) for event: ${event.title}`);
-        synced++;
+        if (processed === 0) {
+          skipped++;
+        } else {
+          synced += processed;
+          console.log(`✅ Synced booking ${booking.id}: ${processed} attendee(s) for event: ${event.title}`);
+        }
         
       } catch (error) {
         console.error(`❌ Error syncing booking ${booking.id}:`, error.message);
