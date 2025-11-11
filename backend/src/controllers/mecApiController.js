@@ -1018,10 +1018,13 @@ export const syncBookings = async (req, res) => {
             ticketCount = seatsCount;
           }
         }
-        // If we have attendees_info, use that count instead
-        if (attendeesInfo.length > 0) {
-          ticketCount = attendeesInfo.length;
+        // Use the maximum of attendees_info length and ticketCount/seats
+        // This handles cases where attendees_info has fewer entries than seats
+        if (attendeesInfo.length > 0 && attendeesInfo.length < ticketCount) {
+          console.log(`⚠️  Booking ${booking.id} has ${ticketCount} seats but only ${attendeesInfo.length} attendee(s) in attendees_info`);
         }
+        // Don't override ticketCount with attendeesInfo.length - use the larger value
+        const finalTicketCount = Math.max(ticketCount, attendeesInfo.length || 0);
         
         let bookingSynced = 0;
         let bookingErrors = 0;
@@ -1033,12 +1036,23 @@ export const syncBookings = async (req, res) => {
 
         if (attendeesInfo.length > 0) {
           // Process each attendee in the attendees_info array
-          for (let i = 0; i < attendeesInfo.length; i++) {
-            const attendee = attendeesInfo[i];
+          // But create registrations up to finalTicketCount (in case seats > attendees_info.length)
+          for (let i = 0; i < finalTicketCount; i++) {
+            // If we have attendee info for this index, use it; otherwise duplicate the first attendee
+            const attendee = i < attendeesInfo.length ? attendeesInfo[i] : attendeesInfo[0];
             
             // Parse attendee data
-            const attendeeName = attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim();
-            const attendeeEmail = attendee.email || '';
+            let attendeeName = attendee.name || `${attendee.first_name || ''} ${attendee.last_name || ''}`.trim();
+            let attendeeEmail = attendee.email || '';
+            
+            // If we're duplicating (i >= attendeesInfo.length), modify the name to indicate seat number
+            if (i >= attendeesInfo.length) {
+              attendeeName = `${attendeeName || booking.name || 'Unknown'} (Seat ${i + 1})`;
+              // Use the booking email if attendee email is not available
+              if (!attendeeEmail || !attendeeEmail.includes('@')) {
+                attendeeEmail = booking.email || '';
+              }
+            }
             
             // Skip attendees with invalid email
             if (!attendeeEmail || !attendeeEmail.includes('@')) {
@@ -1060,7 +1074,8 @@ export const syncBookings = async (req, res) => {
               metadata: {
                 ...booking,
                 attendeeIndex: i,
-                totalAttendees: attendeesInfo.length
+                totalAttendees: finalTicketCount,
+                note: i >= attendeesInfo.length ? 'Duplicate seat - individual attendee info not available' : undefined
               }
             };
 
@@ -1070,7 +1085,7 @@ export const syncBookings = async (req, res) => {
             });
 
             bookingSynced++;
-            console.log(`✅ Synced attendee ${i + 1}/${attendeesInfo.length} from booking ${booking.id}: ${attendeeName}`);
+            console.log(`✅ Synced attendee ${i + 1}/${finalTicketCount} from booking ${booking.id}: ${attendeeName}`);
           }
         } else {
           // Fallback to single attendee (legacy booking format)
@@ -1084,14 +1099,14 @@ export const syncBookings = async (req, res) => {
             continue;
           }
 
-          // ticketCount already defined above - use it to create multiple registrations
+          // Use finalTicketCount (which includes seats) to create multiple registrations
           // This handles bookings where attendees_info is empty but ticketCount/seats > 1
-          for (let i = 0; i < ticketCount; i++) {
+          for (let i = 0; i < finalTicketCount; i++) {
             const registrationData = {
               mecBookingId: String(booking.id),
               sourceUrl,
               eventId: event.id,
-              attendeeName: ticketCount > 1 ? `${attendeeName || 'Unknown'} (Seat ${i + 1})` : (attendeeName || 'Unknown'),
+              attendeeName: finalTicketCount > 1 ? `${attendeeName || 'Unknown'} (Seat ${i + 1})` : (attendeeName || 'Unknown'),
               attendeeEmail: attendeeEmail,
               attendeePhone: booking.phone || '',
               numberOfTickets: 1,
@@ -1100,8 +1115,8 @@ export const syncBookings = async (req, res) => {
               metadata: {
                 ...booking,
                 attendeeIndex: i,
-                totalAttendees: ticketCount,
-                note: ticketCount > 1 ? 'Multiple seats - individual attendee info not available' : undefined
+                totalAttendees: finalTicketCount,
+                note: finalTicketCount > 1 ? 'Multiple seats - individual attendee info not available' : undefined
               }
             };
 
@@ -1113,11 +1128,11 @@ export const syncBookings = async (req, res) => {
             bookingSynced++;
           }
           
-          if (ticketCount > 1) {
-            console.log(`✅ Created ${ticketCount} registration(s) from booking ${booking.id} with ${ticketCount} seat(s)`);
+          if (finalTicketCount > 1) {
+            console.log(`✅ Created ${finalTicketCount} registration(s) from booking ${booking.id} with ${finalTicketCount} seat(s)`);
           }
 
-          console.log(`✅ Synced ${ticketCount} attendee(s) from booking ${booking.id}: ${attendeeName}`);
+          console.log(`✅ Synced ${finalTicketCount} attendee(s) from booking ${booking.id}: ${attendeeName}`);
         }
 
         syncedCount += bookingSynced;
