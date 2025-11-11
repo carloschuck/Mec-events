@@ -278,15 +278,34 @@ class MEC_API_Bridge {
     }
     
     private function format_booking_data($booking, $attendees = array(), $debug_user_query = array()) {
-        // Decode attendees info if it's JSON
-        $attendees_info = isset($booking->attendees_info) ? json_decode($booking->attendees_info, true) : array();
+        // Decode attendees info if it's JSON - this is the primary source
+        // MEC stores attendees_info as a JSON string in the booking record
+        $attendees_info = array();
+        if (isset($booking->attendees_info) && !empty($booking->attendees_info)) {
+            // Try to decode as JSON
+            $decoded = json_decode($booking->attendees_info, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $attendees_info = $decoded;
+            } elseif (is_string($booking->attendees_info)) {
+                // If it's a string but not valid JSON, try unserialize (some WordPress plugins use serialize)
+                $unserialized = @unserialize($booking->attendees_info);
+                if ($unserialized !== false && is_array($unserialized)) {
+                    $attendees_info = $unserialized;
+                }
+            }
+        }
         
-        // If attendees_info is empty but we have attendees from the attendees table, use those
-        if (empty($attendees_info) && !empty($attendees)) {
+        // Ensure attendees_info is an array
+        if (!is_array($attendees_info)) {
             $attendees_info = array();
+        }
+        
+        // Convert attendees from mec_attendees table to the same format
+        $table_attendees = array();
+        if (!empty($attendees)) {
             foreach ($attendees as $attendee) {
                 $attendee_array = (array) $attendee;
-                $attendees_info[] = array(
+                $table_attendees[] = array(
                     'name' => isset($attendee_array['name']) ? $attendee_array['name'] : 
                              (trim((isset($attendee_array['first_name']) ? $attendee_array['first_name'] : '') . ' ' . (isset($attendee_array['last_name']) ? $attendee_array['last_name'] : ''))),
                     'first_name' => isset($attendee_array['first_name']) ? $attendee_array['first_name'] : '',
@@ -299,6 +318,23 @@ class MEC_API_Bridge {
                               (isset($attendee_array['tel']) ? $attendee_array['tel'] : '')
                 );
             }
+        }
+        
+        // Merge: Use attendees_info from JSON as primary source, supplement with table attendees if needed
+        // If JSON has fewer entries than table, merge them (JSON takes priority for matching indices)
+        if (empty($attendees_info) && !empty($table_attendees)) {
+            // No JSON data, use table data
+            $attendees_info = $table_attendees;
+        } elseif (!empty($attendees_info) && !empty($table_attendees)) {
+            // Both exist - merge them, prioritizing JSON but adding any missing from table
+            $merged = $attendees_info;
+            // If table has more attendees than JSON, add the extras
+            if (count($table_attendees) > count($attendees_info)) {
+                for ($i = count($attendees_info); $i < count($table_attendees); $i++) {
+                    $merged[] = $table_attendees[$i];
+                }
+            }
+            $attendees_info = $merged;
         }
         
         // Extract primary attendee information from attendees table if available
