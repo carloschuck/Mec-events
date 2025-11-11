@@ -44,7 +44,7 @@ const Registration = sequelize.define('Registration', {
   },
   attendeeIndex: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     defaultValue: 0,
     comment: 'Zero-based index for multi-attendee bookings'
   },
