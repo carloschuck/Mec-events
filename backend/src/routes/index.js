@@ -139,6 +139,66 @@ router.post('/sync-bookings', async (req, res) => {
   }
 });
 
+// Run attendeeIndex migration endpoint
+router.post('/migrate/attendee-index', async (req, res) => {
+  try {
+    console.log('🔄 Running attendeeIndex migration...');
+    
+    const { sequelize } = await import('../models/index.js');
+    const { QueryTypes } = await import('sequelize');
+    
+    // Add column if it doesn't exist
+    await sequelize.query(`
+      ALTER TABLE registrations
+      ADD COLUMN IF NOT EXISTS "attendeeIndex" INTEGER DEFAULT 0 NOT NULL
+    `);
+
+    // Populate from metadata
+    await sequelize.query(
+      `
+      UPDATE registrations
+      SET "attendeeIndex" = COALESCE(
+        (metadata->>'attendeeIndex')::INTEGER,
+        0
+      )
+      WHERE "attendeeIndex" IS NULL
+      `,
+      { type: QueryTypes.UPDATE }
+    );
+
+    // Drop old index if exists
+    await sequelize.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_indexes
+          WHERE schemaname = 'public' AND indexname = 'unique_booking_per_site'
+        ) THEN
+          DROP INDEX unique_booking_per_site;
+        END IF;
+      END $$;
+    `);
+
+    // Create new unique index
+    await sequelize.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS unique_booking_per_site
+      ON registrations("sourceUrl", "mecBookingId", "attendeeIndex")
+    `);
+
+    res.json({
+      success: true,
+      message: 'attendeeIndex migration completed successfully'
+    });
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
+});
+
 // Debug: List all registered routes
 console.log('🔍 Registered routes:');
 router.stack.forEach((layer) => {
