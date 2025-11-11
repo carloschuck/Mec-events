@@ -202,11 +202,24 @@ class MEC_API_Bridge {
             // Get attendees for this booking if attendees table exists
             $attendees = array();
             if ($has_attendees_table) {
+                // MEC uses booking_id field in mec_attendees table
+                // Try booking_id first (this is the MEC booking ID, not the WordPress post ID)
+                $mec_booking_id = isset($booking->booking_id) ? $booking->booking_id : $booking->id;
+                
                 $attendees_query = $wpdb->prepare(
-                    "SELECT * FROM $attendees_table WHERE booking_id = %d",
-                    intval($booking->id)
+                    "SELECT * FROM $attendees_table WHERE booking_id = %d ORDER BY id ASC",
+                    intval($mec_booking_id)
                 );
                 $attendees = $wpdb->get_results($attendees_query);
+                
+                // If no results with booking_id, try with the booking record id as fallback
+                if (empty($attendees)) {
+                    $attendees_query = $wpdb->prepare(
+                        "SELECT * FROM $attendees_table WHERE booking_id = %d ORDER BY id ASC",
+                        intval($booking->id)
+                    );
+                    $attendees = $wpdb->get_results($attendees_query);
+                }
             }
             
             // If no attendees found and booking has user_id, get user info from WordPress users table
