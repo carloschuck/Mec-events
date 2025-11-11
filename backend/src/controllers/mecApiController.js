@@ -1118,19 +1118,33 @@ export const syncBookings = async (req, res) => {
 /**
  * Debug endpoint to analyze bookings for a specific event
  * GET /api/mec-api/debug/event-bookings/:eventId
+ * Query params: ?title=... to search by title instead of ID
  */
 export const debugEventBookings = async (req, res) => {
   try {
     const { eventId } = req.params;
+    const { title } = req.query;
     const mecApiUrl = getSanitizedMecApiUrl();
     const sourceUrl = mecApiUrl;
 
     // Find the event in our database
-    const event = await Event.findByPk(eventId);
+    let event;
+    if (title) {
+      // Search by title
+      event = await Event.findOne({
+        where: {
+          title: { [Op.iLike]: `%${title}%` }
+        }
+      });
+    } else {
+      // Find by ID
+      event = await Event.findByPk(eventId);
+    }
+
     if (!event) {
       return res.status(404).json({
         success: false,
-        message: 'Event not found in database'
+        message: title ? `Event not found with title containing "${title}"` : 'Event not found in database'
       });
     }
 
@@ -1203,9 +1217,50 @@ export const debugEventBookings = async (req, res) => {
 
     const dbAttendeeCount = registrations.length;
 
-    // Find missing bookings
+    // Group registrations by booking ID
+    const registrationsByBooking = {};
+    registrations.forEach(reg => {
+      const bookingId = reg.mecBookingId;
+      if (!registrationsByBooking[bookingId]) {
+        registrationsByBooking[bookingId] = [];
+      }
+      registrationsByBooking[bookingId].push(reg);
+    });
+
+    // Find missing bookings and bookings with missing attendees
     const dbBookingIds = new Set(registrations.map(r => r.mecBookingId));
-    const missingBookings = allBookings.filter(b => !dbBookingIds.has(String(b.id)));
+    const missingBookings = [];
+    const incompleteBookings = [];
+
+    for (const booking of allBookings) {
+      const bookingId = String(booking.id);
+      const attendeesInfo = booking.attendees_info || [];
+      
+      if (!dbBookingIds.has(bookingId)) {
+        // Booking completely missing
+        missingBookings.push(booking);
+      } else {
+        // Check if all attendees are synced
+        let expectedAttendees = 0;
+        if (attendeesInfo.length > 0) {
+          expectedAttendees = attendeesInfo.filter(a => a.email && a.email.includes('@')).length;
+        } else {
+          const ticketCount = parseInt(booking.tickets || booking.count || 1);
+          const hasValidEmail = booking.email && booking.email.includes('@');
+          expectedAttendees = hasValidEmail ? ticketCount : 0;
+        }
+
+        const syncedAttendees = registrationsByBooking[bookingId]?.length || 0;
+        if (syncedAttendees < expectedAttendees) {
+          incompleteBookings.push({
+            booking,
+            expectedAttendees,
+            syncedAttendees,
+            missing: expectedAttendees - syncedAttendees
+          });
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -1221,11 +1276,13 @@ export const debugEventBookings = async (req, res) => {
         bookingDetails
       },
       database: {
-        totalRegistrations: dbAttendeeCount
+        totalRegistrations: dbAttendeeCount,
+        uniqueBookings: Object.keys(registrationsByBooking).length
       },
       discrepancy: {
         missing: wordpressAttendeeCount - dbAttendeeCount,
         missingBookings: missingBookings.length,
+        incompleteBookings: incompleteBookings.length,
         missingBookingDetails: missingBookings.map(b => ({
           bookingId: b.id,
           eventId: b.event_id,
@@ -1233,6 +1290,16 @@ export const debugEventBookings = async (req, res) => {
           name: b.name || `${b.first_name || ''} ${b.last_name || ''}`.trim(),
           attendeesInfoLength: (b.attendees_info || []).length,
           tickets: b.tickets || b.count || 1
+        })),
+        incompleteBookingDetails: incompleteBookings.map(ib => ({
+          bookingId: ib.booking.id,
+          eventId: ib.booking.event_id,
+          expectedAttendees: ib.expectedAttendees,
+          syncedAttendees: ib.syncedAttendees,
+          missing: ib.missing,
+          email: ib.booking.email,
+          name: ib.booking.name || `${ib.booking.first_name || ''} ${ib.booking.last_name || ''}`.trim(),
+          attendeesInfoLength: (ib.booking.attendees_info || []).length
         }))
       }
     });
