@@ -281,6 +281,26 @@ class MEC_API_Bridge {
         // Decode attendees info if it's JSON
         $attendees_info = isset($booking->attendees_info) ? json_decode($booking->attendees_info, true) : array();
         
+        // If attendees_info is empty but we have attendees from the attendees table, use those
+        if (empty($attendees_info) && !empty($attendees)) {
+            $attendees_info = array();
+            foreach ($attendees as $attendee) {
+                $attendee_array = (array) $attendee;
+                $attendees_info[] = array(
+                    'name' => isset($attendee_array['name']) ? $attendee_array['name'] : 
+                             (trim((isset($attendee_array['first_name']) ? $attendee_array['first_name'] : '') . ' ' . (isset($attendee_array['last_name']) ? $attendee_array['last_name'] : ''))),
+                    'first_name' => isset($attendee_array['first_name']) ? $attendee_array['first_name'] : '',
+                    'last_name' => isset($attendee_array['last_name']) ? $attendee_array['last_name'] : '',
+                    'email' => isset($attendee_array['email']) ? $attendee_array['email'] : 
+                              (isset($attendee_array['user_email']) ? $attendee_array['user_email'] : ''),
+                    'tel' => isset($attendee_array['tel']) ? $attendee_array['tel'] : 
+                            (isset($attendee_array['phone']) ? $attendee_array['phone'] : ''),
+                    'phone' => isset($attendee_array['phone']) ? $attendee_array['phone'] : 
+                              (isset($attendee_array['tel']) ? $attendee_array['tel'] : '')
+                );
+            }
+        }
+        
         // Extract primary attendee information from attendees table if available
         $primary_attendee = array();
         if (!empty($attendees)) {
