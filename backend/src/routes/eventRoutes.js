@@ -7,6 +7,7 @@ import {
   exportEventCSV,
   getEventAnalytics,
   getEventFilters,
+  deleteEvent,
   testMecConnection
 } from '../controllers/eventController.js';
 import { protect, authorize } from '../middleware/auth.js';
@@ -21,6 +22,7 @@ router.get('/:id/analytics', protect, getEventAnalytics);
 router.post('/sync', protect, authorize('admin'), syncEvents);
 router.get('/:id/export/pdf', protect, exportEventPDF);
 router.get('/:id/export/csv', protect, exportEventCSV);
+router.delete('/:id', protect, authorize('admin'), deleteEvent);
 
 export default router;
 

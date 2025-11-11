@@ -6,14 +6,13 @@ import { useAuthStore } from '../store/authStore';
 import { 
   Calendar, 
   MapPin, 
-  Users, 
-  CheckCircle, 
   Search,
   RefreshCw,
   Filter,
   SortAsc,
   SortDesc,
-  X
+  X,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,6 +29,7 @@ const Events = () => {
   const [sortOrder, setSortOrder] = useState('ASC');
   const [filterOptions, setFilterOptions] = useState({ locations: [], dateStats: {} });
   const [showFilters, setShowFilters] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const { user } = useAuthStore();
 
   useEffect(() => {
@@ -48,6 +48,24 @@ const Events = () => {
       }
     } catch (error) {
       console.error('Failed to load filter options:', error);
+    }
+  };
+
+  const handleDelete = async (eventId, title) => {
+    const confirmed = window.confirm(`Delete "${title}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingId(eventId);
+    try {
+      const response = await api.delete(`/events/${eventId}`);
+      if (response.data.success) {
+        toast.success('Event deleted successfully');
+        fetchEvents();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete event');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -337,9 +355,27 @@ const Events = () => {
                   <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
                     {event.title}
                   </h3>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusColor(event.status)}`}>
-                    {event.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${getStatusColor(event.status)}`}>
+                      {event.status}
+                    </span>
+                    {user?.role === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(event.id, event.title);
+                        }}
+                        disabled={deletingId === event.id}
+                        className="p-1.5 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        title="Delete event"
+                        aria-label="Delete event"
+                      >
+                        <Trash2 className={`w-4 h-4 ${deletingId === event.id ? 'animate-pulse' : ''}`} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2 text-sm text-gray-600">

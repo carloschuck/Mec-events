@@ -371,6 +371,61 @@ export const exportEventCSV = async (req, res) => {
   }
 };
 
+export const deleteEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { force } = req.query;
+
+    const event = await Event.findByPk(id, {
+      include: [
+        {
+          model: Registration,
+          as: 'registrations',
+          attributes: ['id']
+        }
+      ]
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    const registrationCount = event.registrations?.length || 0;
+
+    if (registrationCount > 0 && force !== 'true') {
+      return res.status(400).json({
+        success: false,
+        message: `Event has ${registrationCount} registration(s). Pass force=true to delete along with registrations.`,
+        registrationCount
+      });
+    }
+
+    if (registrationCount > 0) {
+      await Registration.destroy({
+        where: { eventId: event.id }
+      });
+    }
+
+    await event.destroy();
+
+    res.json({
+      success: true,
+      message: 'Event deleted successfully',
+      deletedRegistrations: registrationCount
+    });
+  } catch (error) {
+    console.error('❌ Error deleting event:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting event',
+      error: error.message
+    });
+  }
+};
+
 export const getEventFilters = async (req, res) => {
   try {
     // Get unique locations

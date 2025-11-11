@@ -1,15 +1,17 @@
 import axios from 'axios';
 import { Event, Registration } from '../models/index.js';
+import { normalizeSourceUrl, sanitizeMecApiBaseUrl } from '../utils/url.js';
 
 class MECService {
   constructor() {
-    this.baseURL = process.env.MEC_API_URL;
+    this.rawBaseURL = process.env.MEC_API_URL;
+    this.baseURL = sanitizeMecApiBaseUrl(this.rawBaseURL);
     this.apiKey = process.env.MEC_API_KEY;
     
     // Only create axios instance if baseURL is available
     if (this.baseURL) {
       this.axiosInstance = axios.create({
-        baseURL: `${this.baseURL.replace(/\/$/, '')}/wp-json/wp/v2`,
+        baseURL: `${this.baseURL}/wp-json/wp/v2`,
         timeout: 30000,
         headers: {
           'Content-Type': 'application/json'
@@ -99,15 +101,12 @@ class MECService {
   async fetchBookings() {
     try {
       // Use MEC Bridge API endpoint instead of WordPress REST API
-      let mecApiUrl = this.baseURL?.replace('/wp-json/mec/v1.0', '');
+      const mecApiUrl = this.baseURL;
       
       if (!mecApiUrl) {
         throw new Error('MEC API URL not configured');
       }
-      
-      // Normalize sourceUrl - remove trailing slash for consistency
-      mecApiUrl = mecApiUrl.replace(/\/$/, '');
-      
+
       console.log(`🔄 Fetching bookings from MEC Bridge API: ${mecApiUrl}/wp-json/mec-bridge/v1/bookings`);
       
       // Fetch all bookings with pagination
@@ -156,7 +155,7 @@ class MECService {
   async syncEvents(sourceUrl = null) {
     try {
       // Determine source URL - use provided URL or extract from base URL
-      const site_url = sourceUrl || this.baseURL || 'unknown';
+      const site_url = normalizeSourceUrl(sourceUrl) || this.baseURL || 'unknown';
       
       console.log(`🔄 Syncing events from MEC (${site_url})...`);
       console.log(`🔍 MEC API URL: ${this.baseURL}`);

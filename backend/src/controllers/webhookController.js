@@ -1,5 +1,6 @@
 import { Event, Registration } from '../models/index.js';
 import crypto from 'crypto';
+import { normalizeSourceUrl } from '../utils/url.js';
 
 export const handleMecWebhook = async (req, res) => {
   try {
@@ -38,9 +39,11 @@ export const handleMecWebhook = async (req, res) => {
     }
 
     const { event_type, data, timestamp, site_url } = req.body;
+    const normalizedSiteUrl = normalizeSourceUrl(site_url);
 
     console.log(`\n📥 Received webhook: ${event_type}`);
     console.log(`   From: ${site_url}`);
+    console.log(`   Normalized Source URL: ${normalizedSiteUrl}`);
     console.log(`   Time: ${timestamp}`);
 
     // Handle different event types
@@ -56,24 +59,24 @@ export const handleMecWebhook = async (req, res) => {
 
       case 'event.saved':
       case 'event.published':
-        await handleEventWebhook(data, site_url);
+        await handleEventWebhook(data, normalizedSiteUrl);
         break;
 
       case 'event.deleted':
-        await handleEventDeletion(data, site_url);
+        await handleEventDeletion(data, normalizedSiteUrl);
         break;
 
       case 'booking.completed':
       case 'booking.confirmed':
-        await handleBookingWebhook(data, site_url);
+        await handleBookingWebhook(data, normalizedSiteUrl);
         break;
 
       case 'booking.canceled':
-        await handleBookingCancellation(data, site_url);
+        await handleBookingCancellation(data, normalizedSiteUrl);
         break;
 
       case 'attendee.checked_in':
-        await handleCheckin(data, site_url);
+        await handleCheckin(data, normalizedSiteUrl);
         break;
 
       default:

@@ -1,5 +1,8 @@
 import { Event, Registration } from '../models/index.js';
 import { Op } from 'sequelize';
+import { normalizeSourceUrl, sanitizeMecApiBaseUrl } from '../utils/url.js';
+
+const getSanitizedMecApiUrl = () => sanitizeMecApiBaseUrl(process.env.MEC_API_URL);
 
 /**
  * MEC REST API Integration Controller
@@ -53,7 +56,7 @@ export const getEvents = async (req, res) => {
     if (labels) params.append('labels', labels);
     if (tags) params.append('tags', tags);
     
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     if (!mecApiUrl) {
       return res.status(400).json({
         success: false,
@@ -107,7 +110,7 @@ export const getEvent = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl || !apiKey) {
@@ -156,7 +159,7 @@ export const getEventTickets = async (req, res) => {
     const { id } = req.params;
     const { occurrence } = req.query;
     
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl || !apiKey) {
@@ -209,7 +212,7 @@ export const getEventFees = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl || !apiKey) {
@@ -264,7 +267,7 @@ export const login = async (req, res) => {
       });
     }
     
-    const mecApiUrl = process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl || !apiKey) {
@@ -315,7 +318,7 @@ export const login = async (req, res) => {
 
 export const syncEvents = async (req, res) => {
   try {
-    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl) {
@@ -324,10 +327,7 @@ export const syncEvents = async (req, res) => {
         message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
-    
-    // Normalize sourceUrl - remove trailing slash for consistency
-    mecApiUrl = mecApiUrl.replace(/\/$/, '');
-    
+
     console.log('🔄 Starting MEC Bridge API events sync...');
     
     // Fetch ALL events with pagination (no date filter) to ensure we have all events that bookings reference
@@ -478,7 +478,7 @@ export const syncEvents = async (req, res) => {
  */
 export const testConnection = async (req, res) => {
   try {
-    const mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     const apiKey = process.env.MEC_API_KEY;
     
     if (!mecApiUrl) {
@@ -539,7 +539,7 @@ export const testConnection = async (req, res) => {
 export const getConfig = async (req, res) => {
   try {
     const config = {
-      baseURL: process.env.MEC_API_URL || 'Not configured',
+      baseURL: getSanitizedMecApiUrl() || 'Not configured',
       hasApiKey: !!process.env.MEC_API_KEY,
       namespace: 'mec/v1.0',
       endpoints: {
@@ -659,8 +659,7 @@ export const cleanupSourceUrlDuplicates = async (req, res) => {
   try {
     const { Event } = await import('../models/index.js');
     
-    // Delete all events with sourceUrl ending in '/'
-    const result = await Event.destroy({
+    const eventsWithTrailingSlash = await Event.findAll({
       where: {
         sourceUrl: {
           [Op.like]: '%/'
@@ -668,10 +667,38 @@ export const cleanupSourceUrlDuplicates = async (req, res) => {
       }
     });
     
+    let updatedCount = 0;
+    let deletedCount = 0;
+    
+    for (const event of eventsWithTrailingSlash) {
+      const normalizedSource = normalizeSourceUrl(event.sourceUrl);
+      
+      if (!normalizedSource || normalizedSource === event.sourceUrl) {
+        continue;
+      }
+      
+      const existing = await Event.findOne({
+        where: {
+          mecEventId: event.mecEventId,
+          sourceUrl: normalizedSource
+        }
+      });
+      
+      if (existing) {
+        await event.destroy();
+        deletedCount++;
+      } else {
+        await event.update({ sourceUrl: normalizedSource });
+        updatedCount++;
+      }
+    }
+    
     res.json({
       success: true,
-      message: `Deleted ${result} events with trailing slash in sourceUrl`,
-      deletedCount: result
+      message: `Normalized sourceUrl for ${eventsWithTrailingSlash.length} events`,
+      processed: eventsWithTrailingSlash.length,
+      updatedCount,
+      deletedCount
     });
   } catch (error) {
     res.status(500).json({
@@ -689,8 +716,7 @@ export const cleanupSourceUrlDuplicates = async (req, res) => {
 export const debugSyncOneBooking = async (req, res) => {
   try {
     const { Event, Registration } = await import('../models/index.js');
-    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
-    mecApiUrl = mecApiUrl.replace(/\/$/, '');
+    const mecApiUrl = getSanitizedMecApiUrl();
     const sourceUrl = mecApiUrl;
     
     // Fetch just 1 booking
@@ -789,8 +815,7 @@ export const debugBookingMatch = async (req, res) => {
   try {
     const { Event } = await import('../models/index.js');
     const testEventId = "37332";
-    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
-    mecApiUrl = mecApiUrl.replace(/\/$/, '');
+    const mecApiUrl = getSanitizedMecApiUrl();
     const sourceUrl = mecApiUrl;
     
     // Try to find the event exactly as the booking sync does
@@ -864,7 +889,7 @@ export const debugEventIds = async (req, res) => {
  */
 export const syncBookings = async (req, res) => {
   try {
-    let mecApiUrl = process.env.MEC_API_URL?.replace('/wp-json/mec/v1.0', '') || process.env.MEC_API_URL;
+    const mecApiUrl = getSanitizedMecApiUrl();
     
     if (!mecApiUrl) {
       return res.status(400).json({
@@ -872,9 +897,6 @@ export const syncBookings = async (req, res) => {
         message: 'MEC API not configured. Please set MEC_API_URL environment variable.'
       });
     }
-    
-    // Normalize sourceUrl - remove trailing slash for consistency
-    mecApiUrl = mecApiUrl.replace(/\/$/, '');
     
     console.log('🔄 Starting MEC Bridge API bookings sync...');
     
