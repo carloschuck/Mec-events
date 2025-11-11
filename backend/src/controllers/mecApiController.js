@@ -996,8 +996,14 @@ export const syncBookings = async (req, res) => {
         
         // Process multiple attendees from attendees_info array
         const attendeesInfo = booking.attendees_info || [];
+        const ticketCount = parseInt(booking.tickets || booking.count || booking.seats || 1, 10);
         let bookingSynced = 0;
         let bookingErrors = 0;
+
+        // Log bookings with multiple tickets/attendees for debugging
+        if (ticketCount > 1 || attendeesInfo.length > 1) {
+          console.log(`🔍 Multi-attendee booking ${booking.id} for event ${event.mecEventId}: tickets=${ticketCount}, attendees_info.length=${attendeesInfo.length}`);
+        }
 
         if (attendeesInfo.length > 0) {
           // Process each attendee in the attendees_info array
@@ -1052,7 +1058,7 @@ export const syncBookings = async (req, res) => {
             continue;
           }
 
-          const ticketCount = Math.max(parseInt(booking.tickets || booking.count || booking.seats || 1, 10), 1);
+          // ticketCount already defined above
           for (let i = 0; i < ticketCount; i++) {
             const registrationData = {
               mecBookingId: String(booking.id),
