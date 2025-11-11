@@ -179,6 +179,12 @@ class MEC_API_Bridge {
         // Check if attendees table exists
         $has_attendees_table = ($wpdb->get_var("SHOW TABLES LIKE '$attendees_table'") == $attendees_table);
         
+        // Debug: Log table existence
+        $debug_table_check = array(
+            'attendees_table_name' => $attendees_table,
+            'attendees_table_exists' => $has_attendees_table
+        );
+        
         // Build query with proper escaping
         if ($event_id) {
             $query = $wpdb->prepare(
@@ -199,27 +205,155 @@ class MEC_API_Bridge {
         
         $formatted_bookings = array();
         foreach ($bookings as $booking) {
+            // Initialize debug array
+            $debug_user_query = array(
+                'table_check' => $debug_table_check
+            );
+            
             // Get attendees for this booking if attendees table exists
             $attendees = array();
             if ($has_attendees_table) {
                 // MEC uses booking_id field in mec_attendees table
-                // Try booking_id first (this is the MEC booking ID, not the WordPress post ID)
-                $mec_booking_id = isset($booking->booking_id) ? $booking->booking_id : $booking->id;
+                // The booking_id in mec_bookings table is the MEC booking ID (e.g., 37776)
+                // The id field is the database record ID (e.g., 5401)
+                // We need to use booking_id to query mec_attendees table
+                $mec_booking_id = null;
                 
-                $attendees_query = $wpdb->prepare(
-                    "SELECT * FROM $attendees_table WHERE booking_id = %d ORDER BY id ASC",
-                    intval($mec_booking_id)
-                );
-                $attendees = $wpdb->get_results($attendees_query);
+                // Convert booking object to array to access all fields
+                $booking_array = (array) $booking;
                 
-                // If no results with booking_id, try with the booking record id as fallback
-                if (empty($attendees)) {
+                // Try to get booking_id from the booking record
+                if (isset($booking_array['booking_id']) && !empty($booking_array['booking_id'])) {
+                    $mec_booking_id = intval($booking_array['booking_id']);
+                } elseif (isset($booking->booking_id) && !empty($booking->booking_id)) {
+                    $mec_booking_id = intval($booking->booking_id);
+                } elseif (isset($booking_array['id'])) {
+                    // Fallback to id if booking_id doesn't exist
+                    $mec_booking_id = intval($booking_array['id']);
+                }
+                
+                // Debug: Log what we're querying
+                $debug_user_query['mec_booking_id_used'] = $mec_booking_id;
+                $debug_user_query['booking_id_from_array'] = isset($booking_array['booking_id']) ? $booking_array['booking_id'] : null;
+                $debug_user_query['booking_id_from_object'] = isset($booking->booking_id) ? $booking->booking_id : null;
+                $debug_user_query['booking_id_field'] = isset($booking_array['booking_id']) ? 'found_in_array' : (isset($booking->booking_id) ? 'found_in_object' : 'not_found');
+                
+                if ($mec_booking_id) {
+                    // Try multiple field names - MEC might use different field names
                     $attendees_query = $wpdb->prepare(
                         "SELECT * FROM $attendees_table WHERE booking_id = %d ORDER BY id ASC",
-                        intval($booking->id)
+                        $mec_booking_id
                     );
                     $attendees = $wpdb->get_results($attendees_query);
+                    
+                    // If no results, try with the booking record id
+                    if (empty($attendees) && isset($booking_array['id'])) {
+                        $attendees_query = $wpdb->prepare(
+                            "SELECT * FROM $attendees_table WHERE booking_id = %d ORDER BY id ASC",
+                            intval($booking_array['id'])
+                        );
+                        $attendees = $wpdb->get_results($attendees_query);
+                        $debug_user_query['fallback_query_used'] = true;
+                        $debug_user_query['fallback_booking_id'] = intval($booking_array['id']);
+                    }
+                    
+                    // Debug: Try to see what fields exist in the attendees table
+                if (empty($attendees)) {
+                    // Get table structure to see what fields exist
+                    $table_structure = $wpdb->get_results("DESCRIBE $attendees_table");
+                    $debug_user_query['attendees_table_structure'] = array();
+                    if ($table_structure) {
+                        foreach ($table_structure as $field) {
+                            $debug_user_query['attendees_table_structure'][] = $field->Field;
+                        }
+                    }
+                    
+                    // Try a sample query to see if table has any data
+                    $sample = $wpdb->get_row("SELECT * FROM $attendees_table LIMIT 1");
+                    $debug_user_query['sample_attendee'] = $sample ? (array) $sample : null;
                 }
+
+                // Additional fallback: MEC stores attendees in mec_booking_attendees with WordPress users
+                if (empty($attendees)) {
+                    $booking_attendees_table = $wpdb->prefix . 'mec_booking_attendees';
+                    $has_booking_attendees_table = ($wpdb->get_var("SHOW TABLES LIKE '$booking_attendees_table'") == $booking_attendees_table);
+                    $debug_user_query['booking_attendees_table_exists'] = $has_booking_attendees_table;
+
+                    if ($has_booking_attendees_table && isset($booking_array['id'])) {
+                        $booking_attendees = $wpdb->get_results(
+                            $wpdb->prepare(
+                                "SELECT mba.*, u.user_email, u.display_name
+                                 FROM $booking_attendees_table AS mba
+                                 LEFT JOIN {$wpdb->users} AS u ON u.ID = mba.user_id
+                                 WHERE mba.mec_booking_id = %d
+                                 ORDER BY mba.id ASC",
+                                intval($booking_array['id'])
+                            )
+                        );
+
+                        $debug_user_query['booking_attendees_found'] = count($booking_attendees);
+
+                        if (!empty($booking_attendees)) {
+                            $debug_user_query['booking_attendees_rows'] = array_map(function($row) {
+                                return array(
+                                    'id' => isset($row->id) ? intval($row->id) : null,
+                                    'mec_booking_id' => isset($row->mec_booking_id) ? intval($row->mec_booking_id) : null,
+                                    'user_id' => isset($row->user_id) ? intval($row->user_id) : null,
+                                    'ticket_id' => isset($row->ticket_id) ? intval($row->ticket_id) : null
+                                );
+                            }, $booking_attendees);
+
+                            foreach ($booking_attendees as $booking_attendee) {
+                                $user_id = intval($booking_attendee->user_id);
+                                $user = $user_id ? get_userdata($user_id) : null;
+
+                                $first_name = '';
+                                $last_name = '';
+                                $email = '';
+                                $phone = '';
+
+                                if ($user) {
+                                    $first_name = $user->first_name ?: get_user_meta($user_id, 'first_name', true);
+                                    $last_name = $user->last_name ?: get_user_meta($user_id, 'last_name', true);
+                                    $email = $user->user_email;
+                                    $phone = get_user_meta($user_id, 'phone', true);
+                                    if (!$phone) {
+                                        $phone = get_user_meta($user_id, 'billing_phone', true);
+                                    }
+                                } elseif ($user_id) {
+                                    $first_name = get_user_meta($user_id, 'first_name', true);
+                                    $last_name = get_user_meta($user_id, 'last_name', true);
+                                    $email = get_user_meta($user_id, 'email', true);
+                                    $phone = get_user_meta($user_id, 'phone', true);
+                                }
+
+                                $name = trim(($first_name ?: '') . ' ' . ($last_name ?: ''));
+                                if (!$name && $user) {
+                                    $name = $user->display_name;
+                                }
+                                if (!$name && $email) {
+                                    $name = $email;
+                                }
+
+                                $attendees[] = array(
+                                    'id' => $booking_attendee->id,
+                                    'user_id' => $user_id,
+                                    'email' => $email,
+                                    'name' => $name,
+                                    'first_name' => $first_name,
+                                    'last_name' => $last_name,
+                                    'tel' => $phone,
+                                    'phone' => $phone,
+                                    'ticket_id' => isset($booking_attendee->ticket_id) ? intval($booking_attendee->ticket_id) : null
+                                );
+                            }
+                        }
+                    }
+                }
+                }
+                
+                $debug_user_query['attendees_found'] = count($attendees);
+                $debug_user_query['attendees_table_exists'] = $has_attendees_table;
             }
             
             // If no attendees found and booking has user_id, get user info from WordPress users table
@@ -245,12 +379,10 @@ class MEC_API_Bridge {
                 }
             }
             
-            // Debug: Add user query info to debug output
-            $debug_user_query = array(
-                'user_id' => isset($booking->user_id) ? $booking->user_id : null,
-                'user_found' => !empty($attendees),
-                'attendees_count' => count($attendees)
-            );
+            // Add user query info to debug output
+            $debug_user_query['user_id'] = isset($booking->user_id) ? $booking->user_id : null;
+            $debug_user_query['user_found'] = !empty($attendees);
+            $debug_user_query['attendees_count'] = count($attendees);
             
             $formatted_bookings[] = $this->format_booking_data($booking, $attendees, $debug_user_query);
         }
@@ -291,20 +423,26 @@ class MEC_API_Bridge {
     }
     
     private function format_booking_data($booking, $attendees = array(), $debug_user_query = array()) {
-        // Decode attendees info if it's JSON - this is the primary source
-        // MEC stores attendees_info as a JSON string in the booking record
+        // Decode attendees info - MEC stores it as JSON or serialized PHP array
         $attendees_info = array();
         if (isset($booking->attendees_info) && !empty($booking->attendees_info)) {
-            // Try to decode as JSON
-            $decoded = json_decode($booking->attendees_info, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $attendees_info = $decoded;
-            } elseif (is_string($booking->attendees_info)) {
-                // If it's a string but not valid JSON, try unserialize (some WordPress plugins use serialize)
-                $unserialized = @unserialize($booking->attendees_info);
+            $raw_attendees_info = $booking->attendees_info;
+            
+            // First try unserialize (WordPress/MEC often uses serialize)
+            if (is_string($raw_attendees_info)) {
+                $unserialized = @unserialize($raw_attendees_info);
                 if ($unserialized !== false && is_array($unserialized)) {
                     $attendees_info = $unserialized;
+                } else {
+                    // If unserialize fails, try JSON decode
+                    $decoded = json_decode($raw_attendees_info, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $attendees_info = $decoded;
+                    }
                 }
+            } elseif (is_array($raw_attendees_info)) {
+                // Already an array
+                $attendees_info = $raw_attendees_info;
             }
         }
         
@@ -395,7 +533,11 @@ class MEC_API_Bridge {
             'raw_booking' => $booking,
             'debug_all_fields' => $all_fields,
             'debug_attendees' => $attendees,
-            'debug_user_query' => $debug_user_query
+            'debug_user_query' => $debug_user_query,
+            'debug_attendees_info_raw' => isset($booking->attendees_info) ? $booking->attendees_info : null,
+            'debug_attendees_info_count' => count($attendees_info),
+            'debug_table_attendees_count' => count($table_attendees),
+            'debug_mec_booking_id' => isset($booking->booking_id) ? $booking->booking_id : null
         );
     }
     
