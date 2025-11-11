@@ -250,6 +250,7 @@ export const getEvent = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error(`❌ Error fetching event ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: 'Error fetching event',
@@ -539,6 +540,7 @@ export const getEventAnalytics = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error(`❌ Error fetching analytics for event ${req.params.id}:`, error);
     res.status(500).json({
       success: false,
       message: 'Error fetching analytics',
